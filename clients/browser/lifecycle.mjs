@@ -126,7 +126,7 @@ export function reduceMainThreadLifecycle(state, event) {
       ? phaseResult(MainThreadPhase.READY, true)
       : phaseResult(MainThreadPhase.FAILED, false, "invalid_internal_event");
   }
-  return phaseResult(MainThreadPhase.FAILED, false, "invalid_internal_event");
+  return phaseResult(MainThreadPhase.FAILED, false, "unhandled_known_event");
 }
 
 export function initialWorkerClientState() {
@@ -229,7 +229,7 @@ export function reduceWorkerClientLifecycle(state, event, limit) {
       ? clientResult(WorkerClientPhase.CLOSED, 0, true)
       : clientResult(WorkerClientPhase.FAILED, 0, false, "invalid_internal_event");
   }
-  return clientResult(WorkerClientPhase.FAILED, 0, false, "invalid_internal_event");
+  return clientResult(WorkerClientPhase.FAILED, 0, false, "unhandled_known_event");
 }
 
 export function initialWorkerHostState() {
@@ -272,7 +272,7 @@ export function reduceWorkerHostLifecycle(state, event) {
       ? phaseResult(phase, true)
       : phaseResult(phase, false, "not_initialized");
   }
-  return phaseResult(WorkerHostPhase.FAILED, false, "invalid_internal_event");
+  return phaseResult(WorkerHostPhase.FAILED, false, "unhandled_known_event");
 }
 
 export function initialDemoState() {
@@ -293,7 +293,11 @@ export function reduceDemoLifecycle(state, event) {
   if (state.phase !== DemoPhase.INITIALIZING) {
     return phaseResult(DemoPhase.FAILED, false, "invalid_internal_event");
   }
-  return event === DemoEvent.INITIALIZED
-    ? phaseResult(DemoPhase.READY, true)
-    : phaseResult(DemoPhase.FAILED, true);
+  if (event === DemoEvent.INITIALIZED) {
+    return phaseResult(DemoPhase.READY, true);
+  }
+  if (event === DemoEvent.INITIALIZATION_FAILED) {
+    return phaseResult(DemoPhase.FAILED, true);
+  }
+  return phaseResult(DemoPhase.FAILED, false, "unhandled_known_event");
 }

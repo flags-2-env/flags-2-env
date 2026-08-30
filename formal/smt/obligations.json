@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "flags2env.smt-obligations.v1",
+  "specifications": [
+    {
+      "path": "formal/smt/application_lifecycle.smt2",
+      "checkSatCount": 17
+    },
+    {
+      "path": "formal/smt/ownership_lattice.smt2",
+      "checkSatCount": 7
+    },
+    {
+      "path": "formal/smt/parser_invariants.smt2",
+      "checkSatCount": 4
+    }
+  ]
+}

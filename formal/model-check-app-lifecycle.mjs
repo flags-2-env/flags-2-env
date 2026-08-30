@@ -29,12 +29,42 @@ function key(state) {
   return JSON.stringify(state);
 }
 
+function assertClosedVocabulary(name, vocabulary) {
+  assert.equal(Object.isFrozen(vocabulary), true, `${name} must be frozen`);
+  const values = Object.values(vocabulary);
+  assert.ok(values.length > 0, `${name} must not be empty`);
+  assert.equal(
+    new Set(values).size,
+    values.length,
+    `${name} contains duplicate wire values`,
+  );
+}
+
+for (const [name, vocabulary] of [
+  ["MainThreadPhase", MainThreadPhase],
+  ["MainThreadEvent", MainThreadEvent],
+  ["WorkerClientPhase", WorkerClientPhase],
+  ["WorkerClientEvent", WorkerClientEvent],
+  ["WorkerHostPhase", WorkerHostPhase],
+  ["WorkerHostEvent", WorkerHostEvent],
+  ["DemoPhase", DemoPhase],
+  ["DemoEvent", DemoEvent],
+]) {
+  assertClosedVocabulary(name, vocabulary);
+}
+
 function assertDeterministic(reducer, state, event, ...rest) {
   const first = reducer(state, event, ...rest);
   const second = reducer(state, event, ...rest);
   assert.deepEqual(first, second);
   assert.equal(Object.isFrozen(first), true);
   assert.equal(Object.isFrozen(first.state), true);
+  assert.deepEqual(Object.keys(first).sort(), ["accepted", "code", "state"]);
+  assert.notEqual(
+    first.code,
+    "unhandled_known_event",
+    `declared event is missing an explicit reducer branch: ${event}`,
+  );
   return first;
 }
 
@@ -214,14 +244,12 @@ assert.equal(
   ).state.phase,
   WorkerClientPhase.FAILED,
 );
-assert.equal(
-  reduceWorkerHostLifecycle(initialWorkerHostState(), "unknown").state.phase,
-  WorkerHostPhase.FAILED,
-);
-assert.equal(
-  reduceDemoLifecycle(initialDemoState(), "unknown").state.phase,
-  DemoPhase.FAILED,
-);
+const invalidHostEvent = reduceWorkerHostLifecycle(initialWorkerHostState(), "unknown");
+assert.equal(invalidHostEvent.state.phase, WorkerHostPhase.FAILED);
+assert.equal(invalidHostEvent.code, "invalid_transition_input");
+const invalidDemoEvent = reduceDemoLifecycle(initialDemoState(), "unknown");
+assert.equal(invalidDemoEvent.state.phase, DemoPhase.FAILED);
+assert.equal(invalidDemoEvent.code, "invalid_transition_input");
 
 process.stdout.write(
   [

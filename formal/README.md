@@ -22,6 +22,9 @@ implementations:
   scanners: case-insensitive comparison, basename slicing, truthiness, and
   the `[20, 10000]` column clamp, over nondeterministic inputs.
 - `smt/parser_invariants.smt2` proves parser dispatch invariants with Z3.
+- `smt/obligations.json` is the closed proof inventory. The runner requires an
+  exact file set and an exact `check-sat` count for every specification, so a
+  deleted theorem cannot silently turn a green run into a weaker claim.
 - `smt/ownership_lattice.smt2` proves the custom borrow checker's ownership
   state machine sound: within bounded traces, no use-after-free or
   double-free can pass unflagged, the canonical allocate/check/use/free
@@ -64,12 +67,13 @@ rejection, response IDs, and worker termination. A hung external worker is a
 declared input and is forced to `failed` by the bounded close timeout.
 
 There is currently no standalone Electron, Tauri, Flutter, SwiftUI, or native
-desktop application in the repository or the `flags-2-env` GitHub organization.
-Desktop webviews use the packaged browser runtime. Adding a standalone app
-requires an `application-surfaces.json` entry, a runtime machine, executable
-conformance tests, and a proof path; the application-scope audit fails closed
-for common desktop markers and any tracked `apps/` tree until that declaration
-exists.
+desktop application in this repository. Separate Flutter and native-desktop
+repositories now exist in the `flags-2-env` organization; their lifecycle
+contracts and checks remain repository-local and are not covered by this
+repository's proof claim. Adding an application here requires an
+`application-surfaces.json` entry, a runtime machine, executable conformance
+tests, and a proof path; the application-scope audit fails closed for common
+desktop markers and any tracked `apps/` tree until that declaration exists.
 
 Run just the application inventory and executable model:
 

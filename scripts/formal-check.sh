@@ -50,8 +50,8 @@ run_manifest() {
         and (split("/") | all(. != "." and . != ".."))
       ))
     and (.languages | type == "array"
-      and length == 3
-      and (sort == ["c", "h", "rs"]))
+      and length == 4
+      and (sort == ["c", "h", "mjs", "rs"]))
     and (.heuristics | type == "boolean")
   ' "$manifest" >/dev/null
 
@@ -160,22 +160,60 @@ run_z3() {
   }
   require_timeout
 
+  local inventory="$repo_root/formal/smt/obligations.json"
+  jq --exit-status '
+    type == "object"
+    and ((keys | sort) == (["schemaVersion", "specifications"] | sort))
+    and .schemaVersion == "flags2env.smt-obligations.v1"
+    and (.specifications | type == "array"
+      and length > 0
+      and length <= 64
+      and (map(.path) | length == (unique | length))
+      and all(
+        type == "object"
+        and ((keys | sort) == (["checkSatCount", "path"] | sort))
+        and (.path | type == "string"
+          and test("^formal/smt/[A-Za-z0-9][A-Za-z0-9._-]*\\.smt2$"))
+        and (.checkSatCount | type == "number"
+          and floor == .
+          and . > 0
+          and . <= 256)
+      ))
+  ' "$inventory" >/dev/null
+
   local -a specs=()
-  local spec output line checks size
+  local spec relative output line checks size expected_checks actual_checks
   while IFS= read -r -d '' spec; do
     specs+=("$spec")
   done < <(find "$repo_root/formal/smt" -type f -name '*.smt2' -print0 | sort -z)
-  if (( ${#specs[@]} == 0 || ${#specs[@]} > 64 )); then
-    echo "expected between 1 and 64 SMT specifications, got ${#specs[@]}" >&2
+  local declared_count
+  declared_count=$(jq '.specifications | length' "$inventory")
+  if (( ${#specs[@]} != declared_count )); then
+    echo "SMT inventory declares $declared_count specifications, found ${#specs[@]}" >&2
     return 1
   fi
   for spec in "${specs[@]}"; do
+    relative=${spec#"$repo_root/"}
+    expected_checks=$(
+      jq --exit-status --arg path "$relative" '
+        [.specifications[] | select(.path == $path) | .checkSatCount]
+        | if length == 1 then .[0] else error("undeclared or duplicate SMT path") end
+      ' "$inventory"
+    ) || {
+      echo "SMT specification is not declared exactly once: $relative" >&2
+      return 1
+    }
+    actual_checks=$(awk '/^[[:space:]]*\(check-sat\)[[:space:]]*$/ { count += 1 } END { print count + 0 }' "$spec")
+    if (( actual_checks != expected_checks )); then
+      echo "SMT obligation count changed for $relative: expected $expected_checks, found $actual_checks" >&2
+      return 1
+    fi
     size=$(wc -c <"$spec")
     if (( size > 1048576 )); then
       echo "SMT specification exceeds 1 MiB: ${spec#"$repo_root/"}" >&2
       return 1
     fi
-    echo "==> Z3: ${spec#"$repo_root/"}"
+    echo "==> Z3: $relative ($expected_checks obligations)"
     output=$(
       timeout \
         --signal=TERM \
@@ -192,8 +230,8 @@ run_z3() {
       fi
       checks=$((checks + 1))
     done <<<"$output"
-    if [[ "$checks" -eq 0 ]]; then
-      echo "no proof obligations were evaluated in $spec" >&2
+    if (( checks != expected_checks )); then
+      echo "Z3 returned $checks results for $relative; expected $expected_checks" >&2
       return 1
     fi
   done

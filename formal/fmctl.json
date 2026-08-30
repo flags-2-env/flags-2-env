@@ -4,6 +4,7 @@
   "gitRef": "main",
   "paths": [
     "src/",
+    "clients/browser/",
     "clients/rust/src/",
     "formal/",
     "tools/borrow-checker/"
@@ -11,6 +12,7 @@
   "languages": [
     "c",
     "h",
+    "mjs",
     "rs"
   ],
   "heuristics": false

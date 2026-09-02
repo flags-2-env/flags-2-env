@@ -1444,7 +1444,12 @@ app_env = load_app_env
 <?php
 require __DIR__ . '/clients/php/lib.php';
 
-$f2e = new Flags2Env(__DIR__ . '/build/libflags2env.dylib');
+$nativeLibrary = getenv('FLAGS2ENV_NATIVE_LIB') ?: match (PHP_OS_FAMILY) {
+    'Darwin' => __DIR__ . '/build/libflags2env.dylib',
+    'Windows' => __DIR__ . '/build/flags2env.dll',
+    default => __DIR__ . '/build/libflags2env.so',
+};
+$f2e = new Flags2Env($nativeLibrary);
 
 function get_env_map(Flags2Env $f2e, array $argv): array {
     $envMap = $_ENV;
@@ -1468,7 +1473,12 @@ final class AppEnv {
     ) {}
 }
 
-$f2e = new Flags2Env(__DIR__ . '/build/libflags2env.dylib');
+$nativeLibrary = getenv('FLAGS2ENV_NATIVE_LIB') ?: match (PHP_OS_FAMILY) {
+    'Darwin' => __DIR__ . '/build/libflags2env.dylib',
+    'Windows' => __DIR__ . '/build/flags2env.dll',
+    default => __DIR__ . '/build/libflags2env.so',
+};
+$f2e = new Flags2Env($nativeLibrary);
 $combined = array_replace($_ENV, $f2e->parse($argv));
 
 $appEnv = new AppEnv(

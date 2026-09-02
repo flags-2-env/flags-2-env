@@ -371,7 +371,10 @@ function testPHP() {
   mkdirp(join(dir, "clients", "php"));
   cpSync(join(root, "clients", "php", "lib.php"), join(dir, "clients", "php", "lib.php"));
   write(join(dir, "snippet.php"), `${snippet("PHP")}\nif (($combined["DEBUG"] ?? null) !== "true" || ($combined["PORT"] ?? null) !== "8181" || ($combined["COLOR"] ?? null) !== "true") { throw new RuntimeException("unexpected combined map"); }\n`);
-  run("PHP README snippet", "php", ["-d", "ffi.enable=true", join(dir, "snippet.php"), "--debug=t", "--port", "8181"], { cwd: dir });
+  run("PHP README snippet", "php", ["-d", "ffi.enable=true", join(dir, "snippet.php"), "--debug=t", "--port", "8181"], {
+  cwd: dir,
+  env: { FLAGS2ENV_NATIVE_LIB: sharedLib },
+});
 }
 
 function testRust() {

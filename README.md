@@ -1499,7 +1499,8 @@ use std::collections::HashMap;
 use std::env;
 
 fn get_env_map() -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
-    let sdk = unsafe { Flags2Env::load(Some("./build/libflags2env.dylib"))? };
+    let native_library = env::var("FLAGS2ENV_NATIVE_LIB").ok();
+    let sdk = unsafe { Flags2Env::load(native_library.as_deref())? };
     let env_map: HashMap<String, String> = env::vars().collect();
     let argv: Vec<String> = env::args().collect();
     let cli = sdk.parse(&argv, None)?;

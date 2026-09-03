@@ -1444,7 +1444,12 @@ app_env = load_app_env
 <?php
 require __DIR__ . '/clients/php/lib.php';
 
-$f2e = new Flags2Env(__DIR__ . '/build/libflags2env.dylib');
+$nativeLibrary = getenv('FLAGS2ENV_NATIVE_LIB') ?: match (PHP_OS_FAMILY) {
+    'Darwin' => __DIR__ . '/build/libflags2env.dylib',
+    'Windows' => __DIR__ . '/build/flags2env.dll',
+    default => __DIR__ . '/build/libflags2env.so',
+};
+$f2e = new Flags2Env($nativeLibrary);
 
 function get_env_map(Flags2Env $f2e, array $argv): array {
     $envMap = $_ENV;
@@ -1468,7 +1473,12 @@ final class AppEnv {
     ) {}
 }
 
-$f2e = new Flags2Env(__DIR__ . '/build/libflags2env.dylib');
+$nativeLibrary = getenv('FLAGS2ENV_NATIVE_LIB') ?: match (PHP_OS_FAMILY) {
+    'Darwin' => __DIR__ . '/build/libflags2env.dylib',
+    'Windows' => __DIR__ . '/build/flags2env.dll',
+    default => __DIR__ . '/build/libflags2env.so',
+};
+$f2e = new Flags2Env($nativeLibrary);
 $combined = array_replace($_ENV, $f2e->parse($argv));
 
 $appEnv = new AppEnv(
@@ -1489,7 +1499,8 @@ use std::collections::HashMap;
 use std::env;
 
 fn get_env_map() -> Result<HashMap<String, String>, Box<dyn std::error::Error>> {
-    let sdk = unsafe { Flags2Env::load(Some("./build/libflags2env.dylib"))? };
+    let native_library = env::var("FLAGS2ENV_NATIVE_LIB").ok();
+    let sdk = unsafe { Flags2Env::load(native_library.as_deref())? };
     let env_map: HashMap<String, String> = env::vars().collect();
     let argv: Vec<String> = env::args().collect();
     let cli = sdk.parse(&argv, None)?;
@@ -1541,7 +1552,16 @@ type, and reports all schema conversion failures through `CoercionError`.
 import Foundation
 
 func getEnvMap(args: [String] = CommandLine.arguments) throws -> [String: String] {
-    let f2e = try Flags2Env(libraryPath: "./build/libflags2env.dylib")
+    let nativeLibrary = ProcessInfo.processInfo.environment["FLAGS2ENV_NATIVE_LIB"] ?? {
+        #if os(macOS)
+        return "./build/libflags2env.dylib"
+        #elseif os(Windows)
+        return "./build/flags2env.dll"
+        #else
+        return "./build/libflags2env.so"
+        #endif
+    }()
+    let f2e = try Flags2Env(libraryPath: nativeLibrary)
     let envMap = ProcessInfo.processInfo.environment
     let cli = try f2e.parse(args)
 
@@ -1567,7 +1587,16 @@ struct AppEnv {
 }
 
 func loadAppEnv(args: [String] = CommandLine.arguments) throws -> AppEnv {
-    let f2e = try Flags2Env(libraryPath: "./build/libflags2env.dylib")
+    let nativeLibrary = ProcessInfo.processInfo.environment["FLAGS2ENV_NATIVE_LIB"] ?? {
+        #if os(macOS)
+        return "./build/libflags2env.dylib"
+        #elseif os(Windows)
+        return "./build/flags2env.dll"
+        #else
+        return "./build/libflags2env.so"
+        #endif
+    }()
+    let f2e = try Flags2Env(libraryPath: nativeLibrary)
     let combined = ProcessInfo.processInfo.environment.merging(try f2e.parse(args)) { _, cli in cli }
 
     return AppEnv(combined)

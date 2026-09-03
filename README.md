@@ -1552,7 +1552,16 @@ type, and reports all schema conversion failures through `CoercionError`.
 import Foundation
 
 func getEnvMap(args: [String] = CommandLine.arguments) throws -> [String: String] {
-    let f2e = try Flags2Env(libraryPath: "./build/libflags2env.dylib")
+    let nativeLibrary = ProcessInfo.processInfo.environment["FLAGS2ENV_NATIVE_LIB"] ?? {
+        #if os(macOS)
+        return "./build/libflags2env.dylib"
+        #elseif os(Windows)
+        return "./build/flags2env.dll"
+        #else
+        return "./build/libflags2env.so"
+        #endif
+    }()
+    let f2e = try Flags2Env(libraryPath: nativeLibrary)
     let envMap = ProcessInfo.processInfo.environment
     let cli = try f2e.parse(args)
 
@@ -1578,7 +1587,16 @@ struct AppEnv {
 }
 
 func loadAppEnv(args: [String] = CommandLine.arguments) throws -> AppEnv {
-    let f2e = try Flags2Env(libraryPath: "./build/libflags2env.dylib")
+    let nativeLibrary = ProcessInfo.processInfo.environment["FLAGS2ENV_NATIVE_LIB"] ?? {
+        #if os(macOS)
+        return "./build/libflags2env.dylib"
+        #elseif os(Windows)
+        return "./build/flags2env.dll"
+        #else
+        return "./build/libflags2env.so"
+        #endif
+    }()
+    let f2e = try Flags2Env(libraryPath: nativeLibrary)
     let combined = ProcessInfo.processInfo.environment.merging(try f2e.parse(args)) { _, cli in cli }
 
     return AppEnv(combined)

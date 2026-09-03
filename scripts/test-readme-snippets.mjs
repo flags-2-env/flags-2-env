@@ -372,9 +372,9 @@ function testPHP() {
   cpSync(join(root, "clients", "php", "lib.php"), join(dir, "clients", "php", "lib.php"));
   write(join(dir, "snippet.php"), `${snippet("PHP")}\nif (($combined["DEBUG"] ?? null) !== "true" || ($combined["PORT"] ?? null) !== "8181" || ($combined["COLOR"] ?? null) !== "true") { throw new RuntimeException("unexpected combined map"); }\n`);
   run("PHP README snippet", "php", ["-d", "ffi.enable=true", join(dir, "snippet.php"), "--debug=t", "--port", "8181"], {
-  cwd: dir,
-  env: { FLAGS2ENV_NATIVE_LIB: sharedLib },
-});
+    cwd: dir,
+    env: { FLAGS2ENV_NATIVE_LIB: sharedLib },
+  });
 }
 
 function testRust() {
@@ -403,7 +403,10 @@ function testSwift() {
   const bin = join(dir, "snippet");
   write(main, `${snippet("Swift")}\nif combined["DEBUG"] != "true" || combined["PORT"] != "8181" || combined["COLOR"] != "true" { fatalError("unexpected combined map: \\(combined)") }\n`);
   run("Swift README snippet compile", "swiftc", [join(root, "clients", "swift", "lib.swift"), main, "-o", bin]);
-  run("Swift README snippet", bin, ["--debug=t", "--port", "8181"], { cwd: dir, env: dynamicLibraryEnv() });
+  run("Swift README snippet", bin, ["--debug=t", "--port", "8181"], {
+    cwd: dir,
+    env: { ...dynamicLibraryEnv(), FLAGS2ENV_NATIVE_LIB: sharedLib },
+  });
 }
 
 function reexportModule(path) {

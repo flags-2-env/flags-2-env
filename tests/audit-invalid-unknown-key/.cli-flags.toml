@@ -1,0 +1,5 @@
+[flags.safe]
+env = "SAFE"
+aliases = ["safe"]
+type = "bool"
+mystery = true

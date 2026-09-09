@@ -1,0 +1,7 @@
+[flags.safe]
+env = "SAFE"
+aliases = ["safe"]
+type = "bool"
+
+[mystery]
+value = "must-not-be-ignored"

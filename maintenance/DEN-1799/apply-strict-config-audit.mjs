@@ -59,8 +59,8 @@ source = replaceOnce(
 source = replaceOnce(
   source,
   `          command->allow_unknown = parsed;\n          command->allow_unknown_set = 1;\n        }\n      }\n      continue;\n    }\n\n    if (section != F2E_SECTION_FLAG || !current) {\n      continue;\n    }`,
-  `          command->allow_unknown = parsed;\n          command->allow_unknown_set = 1;\n        }\n      } else {\n        f2e_record_unknown_config_key(config, "commands.*", key);\n      }\n      continue;\n    }\n\n    if (section == F2E_SECTION_NONE) {\n      f2e_record_unknown_config_key(config, "root", key);\n      continue;\n    }\n\n    if (section != F2E_SECTION_FLAG || !current) {\n      continue;\n    }`,
-  'command/root unknown key handling',
+  `          command->allow_unknown = parsed;\n          command->allow_unknown_set = 1;\n        }\n      } else {\n        f2e_record_unknown_config_key(config, "commands.*", key);\n      }\n      continue;\n    }\n\n    /* F2E_SECTION_NONE can mean an unknown table, which is already recorded\n       at the table header, or a structurally invalid commands table, which has\n       its own specific diagnostic. Do not manufacture a second root-key error\n       for the contents of either table. */\n    if (section != F2E_SECTION_FLAG || !current) {\n      continue;\n    }`,
+  'command unknown key handling',
 );
 
 source = replaceOnce(

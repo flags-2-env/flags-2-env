@@ -8,8 +8,6 @@ use std::{collections::BTreeMap, fmt};
 
 use crate::Flags2Env;
 
-pub mod domain_config;
-
 /// Deterministic environment snapshot. Prefer this over mutating process env.
 pub type EnvMap = BTreeMap<String, String>;
 
@@ -129,9 +127,9 @@ pub fn resolve_bindings(
 fn valid_field(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 128
-        && value.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')
-        })
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-'))
 }
 
 fn valid_env_key(value: &str) -> bool {
@@ -216,10 +214,7 @@ mod tests {
             EnvMap::from([("FLAGS2ENV_ENV_MAP_PROBE".into(), "base".into())]),
             [("FLAGS2ENV_ENV_MAP_PROBE".into(), "override".into())],
         );
-        assert_eq!(
-            env.get("PORT").map(String::as_str),
-            None
-        );
+        assert_eq!(env.get("PORT").map(String::as_str), None);
         assert_eq!(
             env.get("FLAGS2ENV_ENV_MAP_PROBE").map(String::as_str),
             Some("override")
@@ -238,10 +233,7 @@ mod tests {
                 "AUTH_CALLBACK_URL".to_string(),
                 "https://app.example.test/callback".to_string(),
             ),
-            (
-                "UNRELATED_SECRET".to_string(),
-                "must-not-leak".to_string(),
-            ),
+            ("UNRELATED_SECRET".to_string(), "must-not-leak".to_string()),
         ]);
         let declarations = BTreeMap::from([
             ("auth.authority".to_string(), "SHARED_AUTH_URL".to_string()),

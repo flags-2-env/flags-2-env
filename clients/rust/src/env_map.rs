@@ -77,7 +77,11 @@ pub struct EnvBindingSpec {
 impl EnvBindingSpec {
     /// Construct a required, non-empty binding.
     #[must_use]
-    pub fn required(field: impl Into<String>, env_key: impl Into<String>, kind: EnvValueKind) -> Self {
+    pub fn required(
+        field: impl Into<String>,
+        env_key: impl Into<String>,
+        kind: EnvValueKind,
+    ) -> Self {
         Self {
             field: field.into(),
             env_key: env_key.into(),
@@ -90,7 +94,11 @@ impl EnvBindingSpec {
 
     /// Construct an optional binding that is validated whenever it is present.
     #[must_use]
-    pub fn optional(field: impl Into<String>, env_key: impl Into<String>, kind: EnvValueKind) -> Self {
+    pub fn optional(
+        field: impl Into<String>,
+        env_key: impl Into<String>,
+        kind: EnvValueKind,
+    ) -> Self {
         Self {
             field: field.into(),
             env_key: env_key.into(),
@@ -580,7 +588,11 @@ mod tests {
             (EnvValueKind::Bool, "true", Value::Bool(true)),
             (EnvValueKind::Integer, "-42", Value::from(-42)),
             (EnvValueKind::Double, "1.25e2", Value::from(125.0)),
-            (EnvValueKind::Json, "{\"ok\":true}", serde_json::json!({"ok": true})),
+            (
+                EnvValueKind::Json,
+                "{\"ok\":true}",
+                serde_json::json!({"ok": true}),
+            ),
             (EnvValueKind::Array, "[1,2]", serde_json::json!([1, 2])),
             (EnvValueKind::Map, "{\"x\":1}", serde_json::json!({"x": 1})),
         ];
@@ -592,17 +604,35 @@ mod tests {
     #[test]
     fn noncanonical_values_fail_closed() {
         for raw in ["TRUE", "yes", "1", "0", " true", "false "] {
-            assert_eq!(parse_canonical_env_value(EnvValueKind::Bool, raw, false), None);
+            assert_eq!(
+                parse_canonical_env_value(EnvValueKind::Bool, raw, false),
+                None
+            );
         }
         for raw in ["01", "+1", "1.0", "1e3", "0x10", " 1", "1 "] {
-            assert_eq!(parse_canonical_env_value(EnvValueKind::Integer, raw, false), None);
+            assert_eq!(
+                parse_canonical_env_value(EnvValueKind::Integer, raw, false),
+                None
+            );
         }
         for raw in ["NaN", "Infinity", "+1.0", " 1.0", "1.0 "] {
-            assert_eq!(parse_canonical_env_value(EnvValueKind::Double, raw, false), None);
+            assert_eq!(
+                parse_canonical_env_value(EnvValueKind::Double, raw, false),
+                None
+            );
         }
-        assert_eq!(parse_canonical_env_value(EnvValueKind::Array, "{}", false), None);
-        assert_eq!(parse_canonical_env_value(EnvValueKind::Map, "[]", false), None);
-        assert_eq!(parse_canonical_env_value(EnvValueKind::Json, "{bad", false), None);
+        assert_eq!(
+            parse_canonical_env_value(EnvValueKind::Array, "{}", false),
+            None
+        );
+        assert_eq!(
+            parse_canonical_env_value(EnvValueKind::Map, "[]", false),
+            None
+        );
+        assert_eq!(
+            parse_canonical_env_value(EnvValueKind::Json, "{bad", false),
+            None
+        );
     }
 
     #[test]
@@ -613,7 +643,8 @@ mod tests {
             ("SECRET_VALUE".to_string(), marker.to_string()),
         ]);
         let specs = vec![
-            EnvBindingSpec::required("z.secret", "SECRET_VALUE", EnvValueKind::Integer).secret(true),
+            EnvBindingSpec::required("z.secret", "SECRET_VALUE", EnvValueKind::Integer)
+                .secret(true),
             EnvBindingSpec::required("a.bool", "BOOL_VALUE", EnvValueKind::Bool),
             EnvBindingSpec::required("m.missing", "MISSING_VALUE", EnvValueKind::Double),
         ];
@@ -632,7 +663,10 @@ mod tests {
     #[test]
     fn optional_values_are_checked_when_present() {
         let spec = EnvBindingSpec::optional("feature.count", "COUNT", EnvValueKind::Integer);
-        assert_eq!(resolve_typed_bindings(&EnvMap::new(), &[spec.clone()]), Ok(BTreeMap::new()));
+        assert_eq!(
+            resolve_typed_bindings(&EnvMap::new(), &[spec.clone()]),
+            Ok(BTreeMap::new())
+        );
         let invalid = EnvMap::from([("COUNT".to_string(), "1.5".to_string())]);
         let errors = resolve_typed_bindings(&invalid, &[spec]).unwrap_err();
         assert_eq!(errors[0].code, ENV_PARSE);

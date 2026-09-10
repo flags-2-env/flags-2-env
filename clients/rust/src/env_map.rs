@@ -6,10 +6,134 @@
 
 use std::{collections::BTreeMap, fmt};
 
+use serde_json::Value;
+
 use crate::Flags2Env;
 
 /// Deterministic environment snapshot. Prefer this over mutating process env.
 pub type EnvMap = BTreeMap<String, String>;
+
+/// Stable machine code for a required environment value that is absent.
+pub const ENV_MISSING: &str = "ENV_MISSING";
+/// Stable machine code for an environment value that is present but not canonical/parseable.
+pub const ENV_PARSE: &str = "ENV_PARSE";
+/// Stable machine code for an invalid environment declaration.
+pub const ENV_CONTRACT: &str = "ENV_CONTRACT";
+
+/// Portable scalar/container kinds used by ORES runtime environment contracts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EnvValueKind {
+    String,
+    Bool,
+    Integer,
+    Double,
+    Json,
+    Array,
+    Map,
+}
+
+impl EnvValueKind {
+    /// Parse the canonical cross-runtime name used by runtime TOML contracts.
+    #[must_use]
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "string" => Some(Self::String),
+            "bool" => Some(Self::Bool),
+            "integer" => Some(Self::Integer),
+            "double" | "float" => Some(Self::Double),
+            "json" => Some(Self::Json),
+            "array" => Some(Self::Array),
+            "map" => Some(Self::Map),
+            _ => None,
+        }
+    }
+
+    /// Canonical name used in diagnostics and conformance fixtures.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Bool => "bool",
+            Self::Integer => "integer",
+            Self::Double => "double",
+            Self::Json => "json",
+            Self::Array => "array",
+            Self::Map => "map",
+        }
+    }
+}
+
+/// One admitted runtime-config binding to the immutable environment snapshot.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvBindingSpec {
+    pub field: String,
+    pub env_key: String,
+    pub kind: EnvValueKind,
+    pub required: bool,
+    pub secret: bool,
+    pub allow_empty: bool,
+}
+
+impl EnvBindingSpec {
+    /// Construct a required, non-empty binding.
+    #[must_use]
+    pub fn required(field: impl Into<String>, env_key: impl Into<String>, kind: EnvValueKind) -> Self {
+        Self {
+            field: field.into(),
+            env_key: env_key.into(),
+            kind,
+            required: true,
+            secret: false,
+            allow_empty: false,
+        }
+    }
+
+    /// Construct an optional binding that is validated whenever it is present.
+    #[must_use]
+    pub fn optional(field: impl Into<String>, env_key: impl Into<String>, kind: EnvValueKind) -> Self {
+        Self {
+            field: field.into(),
+            env_key: env_key.into(),
+            kind,
+            required: false,
+            secret: false,
+            allow_empty: false,
+        }
+    }
+
+    /// Mark the binding secret so callers can preserve that fact in diagnostics.
+    #[must_use]
+    pub const fn secret(mut self, secret: bool) -> Self {
+        self.secret = secret;
+        self
+    }
+
+    /// Explicitly permit an empty string for string bindings.
+    #[must_use]
+    pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
+        self.allow_empty = allow_empty;
+        self
+    }
+}
+
+/// Redacted deterministic preflight diagnostic. Runtime values are never stored.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EnvDiagnostic {
+    pub code: &'static str,
+    pub name: String,
+    pub expected: String,
+    pub secret: bool,
+}
+
+impl fmt::Display for EnvDiagnostic {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}: {} must be {}",
+            self.code, self.name, self.expected
+        )
+    }
+}
 
 /// Redacted error returned while binding admitted domain configuration to RuntimeConfig.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -122,6 +246,173 @@ pub fn resolve_bindings(
     }
 
     Ok(resolved)
+}
+
+/// Validate and type all admitted environment declarations in one deterministic pass.
+///
+/// Every present value is checked, including optional values. Missing required values,
+/// malformed declarations, duplicate keys, and values that are not canonical for the declared
+/// kind are collected and returned together. The function is pure and never reads or mutates the
+/// process environment.
+///
+/// CLI aliases are expected to be normalized by flags-2-env before this function is called. This
+/// means `--feature=yes` may become the canonical string `true`, while a raw environment value of
+/// `FEATURE=yes` is rejected instead of being interpreted differently by each language runtime.
+///
+/// Returned values are typed JSON values keyed by symbolic field name. This gives callers an
+/// immutable, language-neutral `RuntimeConfig` representation without a second ad-hoc parser.
+///
+/// # Errors
+/// Returns a stable, redacted diagnostic list sorted by environment key and symbolic field name.
+pub fn resolve_typed_bindings(
+    env: &EnvMap,
+    specs: &[EnvBindingSpec],
+) -> Result<BTreeMap<String, Value>, Vec<EnvDiagnostic>> {
+    let mut ordered = specs.to_vec();
+    ordered.sort_by(|left, right| {
+        left.env_key
+            .cmp(&right.env_key)
+            .then_with(|| left.field.cmp(&right.field))
+    });
+
+    let mut resolved = BTreeMap::new();
+    let mut owners = BTreeMap::<String, String>::new();
+    let mut diagnostics = Vec::new();
+
+    for spec in ordered {
+        if !valid_field(&spec.field) {
+            diagnostics.push(EnvDiagnostic {
+                code: ENV_CONTRACT,
+                name: spec.field,
+                expected: "portable symbolic field name".to_string(),
+                secret: spec.secret,
+            });
+            continue;
+        }
+        if !valid_env_key(&spec.env_key) {
+            diagnostics.push(EnvDiagnostic {
+                code: ENV_CONTRACT,
+                name: spec.env_key,
+                expected: "environment key matching ^[A-Z_][A-Z0-9_]*$".to_string(),
+                secret: spec.secret,
+            });
+            continue;
+        }
+        if owners
+            .insert(spec.env_key.clone(), spec.field.clone())
+            .is_some()
+        {
+            diagnostics.push(EnvDiagnostic {
+                code: ENV_CONTRACT,
+                name: spec.env_key,
+                expected: "unique environment key".to_string(),
+                secret: spec.secret,
+            });
+            continue;
+        }
+
+        let Some(raw) = env.get(&spec.env_key) else {
+            if spec.required {
+                diagnostics.push(EnvDiagnostic {
+                    code: ENV_MISSING,
+                    name: spec.env_key,
+                    expected: spec.kind.as_str().to_string(),
+                    secret: spec.secret,
+                });
+            }
+            continue;
+        };
+
+        match parse_canonical_env_value(spec.kind, raw, spec.allow_empty) {
+            Some(value) => {
+                resolved.insert(spec.field, value);
+            }
+            None => diagnostics.push(EnvDiagnostic {
+                code: ENV_PARSE,
+                name: spec.env_key,
+                expected: if spec.kind == EnvValueKind::String && !spec.allow_empty {
+                    "non-empty string".to_string()
+                } else {
+                    spec.kind.as_str().to_string()
+                },
+                secret: spec.secret,
+            }),
+        }
+    }
+
+    if diagnostics.is_empty() {
+        Ok(resolved)
+    } else {
+        Err(diagnostics)
+    }
+}
+
+/// Parse one canonical environment value using the shared lexical rules.
+///
+/// These rules intentionally reject runtime-specific conveniences: booleans are exactly
+/// `true`/`false`, integers are canonical signed base-10 i64 values with no leading zeroes,
+/// doubles use JSON-number syntax and must be finite, and arrays/maps use strict JSON roots.
+/// JSON values use RFC/JSON whitespace rules; scalar booleans and numbers do not accept padding.
+#[must_use]
+pub fn parse_canonical_env_value(
+    kind: EnvValueKind,
+    raw: &str,
+    allow_empty: bool,
+) -> Option<Value> {
+    match kind {
+        EnvValueKind::String => {
+            if !allow_empty && raw.is_empty() {
+                None
+            } else {
+                Some(Value::String(raw.to_string()))
+            }
+        }
+        EnvValueKind::Bool => match raw {
+            "true" => Some(Value::Bool(true)),
+            "false" => Some(Value::Bool(false)),
+            _ => None,
+        },
+        EnvValueKind::Integer => parse_canonical_integer(raw).map(Value::from),
+        EnvValueKind::Double => {
+            if raw.trim() != raw {
+                return None;
+            }
+            let value: Value = serde_json::from_str(raw).ok()?;
+            let number = value.as_number()?;
+            let parsed = number.as_f64()?;
+            if parsed.is_finite() {
+                Some(value)
+            } else {
+                None
+            }
+        }
+        EnvValueKind::Json => serde_json::from_str(raw).ok(),
+        EnvValueKind::Array => {
+            let value: Value = serde_json::from_str(raw).ok()?;
+            value.is_array().then_some(value)
+        }
+        EnvValueKind::Map => {
+            let value: Value = serde_json::from_str(raw).ok()?;
+            value.is_object().then_some(value)
+        }
+    }
+}
+
+fn parse_canonical_integer(raw: &str) -> Option<i64> {
+    if raw.is_empty() || raw.trim() != raw {
+        return None;
+    }
+    let digits = raw.strip_prefix('-').unwrap_or(raw);
+    if digits.is_empty() {
+        return None;
+    }
+    if digits.len() > 1 && digits.starts_with('0') {
+        return None;
+    }
+    if !digits.bytes().all(|byte| byte.is_ascii_digit()) {
+        return None;
+    }
+    raw.parse::<i64>().ok()
 }
 
 fn valid_field(value: &str) -> bool {
@@ -281,6 +572,70 @@ mod tests {
         assert!(matches!(error, BindingError::DuplicateEnvKey { .. }));
         let rendered = format!("{error:?} {error}");
         assert!(!rendered.contains(marker));
+    }
+
+    #[test]
+    fn canonical_scalar_and_container_values_are_typed() {
+        let cases = [
+            (EnvValueKind::Bool, "true", Value::Bool(true)),
+            (EnvValueKind::Integer, "-42", Value::from(-42)),
+            (EnvValueKind::Double, "1.25e2", Value::from(125.0)),
+            (EnvValueKind::Json, "{\"ok\":true}", serde_json::json!({"ok": true})),
+            (EnvValueKind::Array, "[1,2]", serde_json::json!([1, 2])),
+            (EnvValueKind::Map, "{\"x\":1}", serde_json::json!({"x": 1})),
+        ];
+        for (kind, raw, expected) in cases {
+            assert_eq!(parse_canonical_env_value(kind, raw, false), Some(expected));
+        }
+    }
+
+    #[test]
+    fn noncanonical_values_fail_closed() {
+        for raw in ["TRUE", "yes", "1", "0", " true", "false "] {
+            assert_eq!(parse_canonical_env_value(EnvValueKind::Bool, raw, false), None);
+        }
+        for raw in ["01", "+1", "1.0", "1e3", "0x10", " 1", "1 "] {
+            assert_eq!(parse_canonical_env_value(EnvValueKind::Integer, raw, false), None);
+        }
+        for raw in ["NaN", "Infinity", "+1.0", " 1.0", "1.0 "] {
+            assert_eq!(parse_canonical_env_value(EnvValueKind::Double, raw, false), None);
+        }
+        assert_eq!(parse_canonical_env_value(EnvValueKind::Array, "{}", false), None);
+        assert_eq!(parse_canonical_env_value(EnvValueKind::Map, "[]", false), None);
+        assert_eq!(parse_canonical_env_value(EnvValueKind::Json, "{bad", false), None);
+    }
+
+    #[test]
+    fn typed_bindings_collect_redacted_deterministic_errors() {
+        let marker = "synthetic-secret-never-reflect";
+        let env = EnvMap::from([
+            ("BOOL_VALUE".to_string(), "YES".to_string()),
+            ("SECRET_VALUE".to_string(), marker.to_string()),
+        ]);
+        let specs = vec![
+            EnvBindingSpec::required("z.secret", "SECRET_VALUE", EnvValueKind::Integer).secret(true),
+            EnvBindingSpec::required("a.bool", "BOOL_VALUE", EnvValueKind::Bool),
+            EnvBindingSpec::required("m.missing", "MISSING_VALUE", EnvValueKind::Double),
+        ];
+        let errors = resolve_typed_bindings(&env, &specs).unwrap_err();
+        assert_eq!(errors.len(), 3);
+        assert_eq!(errors[0].name, "BOOL_VALUE");
+        assert_eq!(errors[0].code, ENV_PARSE);
+        assert_eq!(errors[1].name, "MISSING_VALUE");
+        assert_eq!(errors[1].code, ENV_MISSING);
+        assert_eq!(errors[2].name, "SECRET_VALUE");
+        assert!(errors[2].secret);
+        let rendered = format!("{errors:?}");
+        assert!(!rendered.contains(marker));
+    }
+
+    #[test]
+    fn optional_values_are_checked_when_present() {
+        let spec = EnvBindingSpec::optional("feature.count", "COUNT", EnvValueKind::Integer);
+        assert_eq!(resolve_typed_bindings(&EnvMap::new(), &[spec.clone()]), Ok(BTreeMap::new()));
+        let invalid = EnvMap::from([("COUNT".to_string(), "1.5".to_string())]);
+        let errors = resolve_typed_bindings(&invalid, &[spec]).unwrap_err();
+        assert_eq!(errors[0].code, ENV_PARSE);
     }
 
     #[test]

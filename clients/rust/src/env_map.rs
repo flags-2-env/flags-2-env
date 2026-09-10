@@ -664,7 +664,7 @@ mod tests {
     fn optional_values_are_checked_when_present() {
         let spec = EnvBindingSpec::optional("feature.count", "COUNT", EnvValueKind::Integer);
         assert_eq!(
-            resolve_typed_bindings(&EnvMap::new(), &[spec.clone()]),
+            resolve_typed_bindings(&EnvMap::new(), std::slice::from_ref(&spec)),
             Ok(BTreeMap::new())
         );
         let invalid = EnvMap::from([("COUNT".to_string(), "1.5".to_string())]);

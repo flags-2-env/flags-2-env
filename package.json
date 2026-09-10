@@ -17,6 +17,7 @@
       "require": "./clients/nodejs/lib.cjs",
       "default": "./clients/nodejs/lib.mjs"
     },
+    "./env-manifest": "./clients/nodejs/env-manifest.mjs",
     "./bun": {
       "types": "./clients/bun/lib.ts",
       "bun": "./clients/bun/lib.mjs",
@@ -34,6 +35,7 @@
     "pack:dry-run": "npm pack --dry-run",
     "release:audit": "node scripts/audit-release-matrix.mjs",
     "test:readme": "node scripts/test-readme-snippets.mjs",
+    "test:env-manifest": "node --test clients/nodejs/env-manifest.test.mjs",
     "lint:ores": "if [ -f .ores-lint/lint.sh ]; then sh .ores-lint/lint.sh; else echo 'ores-lint not installed'; fi",
     "prepublishOnly": "npm run lint:ores"
   },
@@ -43,6 +45,7 @@
     "clients/nodejs/addon.c",
     "clients/nodejs/binding.gyp",
     "clients/nodejs/cli.mjs",
+    "clients/nodejs/env-manifest.mjs",
     "clients/nodejs/lib.cjs",
     "clients/nodejs/lib.mjs",
     "clients/nodejs/lib.ts",

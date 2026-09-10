@@ -48,9 +48,28 @@ jobs:
           set -euo pipefail
           git config user.name 'ORESoftware'
           git config user.email '11139560+ORESoftware@users.noreply.github.com'
-          while IFS= read -r -d '' path; do
-            git add -- "$path"
-          done < <(git diff --name-only -z)
+          # Stage only the reviewed source/test changes. `make test` deliberately
+          # mutates ignored build outputs and may create an untracked Cargo.lock;
+          # those are execution evidence, not source changes, and must never be
+          # swept into a commit.
+          git add -- \
+            src/parser.c \
+            tests/run.sh \
+            clients/cpp/native/parser.c \
+            clients/csharp/native/parser.c \
+            clients/elixir/native/parser.c \
+            clients/erlang/c_src/parser.c \
+            clients/fortran/src/parser.c \
+            clients/fsharp/native/parser.c \
+            clients/golang/parser.c \
+            clients/java/native/parser.c \
+            clients/matlab/native/parser.c \
+            clients/r/src/parser.c \
+            clients/rust/native/parser.c \
+            clients/zig/native/parser.c
+          git add -u -- \
+            maintenance/DEN-1799/apply-strict-config-audit.mjs \
+            .github/workflows/den-1799-strict-config-repair.yml
           git diff --cached --check
           git commit -m 'DEN-1799: reject unknown cli-flags config entries'
           git push origin "HEAD:${GITHUB_REF_NAME}"

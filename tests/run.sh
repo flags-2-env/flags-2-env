@@ -619,6 +619,28 @@ if [ "$status" -eq 0 ]; then
   exit 1
 fi
 
+UNKNOWN_KEY_CONFIG="$ROOT_DIR/tests/audit-invalid-unknown-key/.cli-flags.toml"
+set +e
+actual="$("$CLI" audit "$UNKNOWN_KEY_CONFIG")"
+status=$?
+set -e
+expected='{"ok":false,"errorCount":1,"warningCount":0,"errors":["unknown key \"mystery\" in [flags.*]"],"warnings":[]}'
+if [ "$status" -eq 0 ] || [ "$actual" != "$expected" ]; then
+  printf 'Unknown config key must fail closed.\nExpected: %s\nActual: %s\n' "$expected" "$actual" >&2
+  exit 1
+fi
+
+UNKNOWN_TABLE_CONFIG="$ROOT_DIR/tests/audit-invalid-unknown-table/.cli-flags.toml"
+set +e
+actual="$("$CLI" audit "$UNKNOWN_TABLE_CONFIG")"
+status=$?
+set -e
+expected='{"ok":false,"errorCount":1,"warningCount":0,"errors":["unknown config table [mystery]"],"warnings":[]}'
+if [ "$status" -eq 0 ] || [ "$actual" != "$expected" ]; then
+  printf 'Unknown config table must fail closed.\nExpected: %s\nActual: %s\n' "$expected" "$actual" >&2
+  exit 1
+fi
+
 INVALID_TYPE_CONFIG="$ROOT_DIR/tests/audit-invalid-type/.cli-flags.toml"
 set +e
 actual="$("$CLI" audit "$INVALID_TYPE_CONFIG")"

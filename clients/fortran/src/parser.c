@@ -199,6 +199,11 @@ typedef struct {
   unsigned help_exclude_columns;
   int invalid_help_columns;
   int invalid_help_exclude_columns;
+  /* First unknown table/key encountered while parsing the authoring contract.
+     Values are deliberately never copied here: audit diagnostics must identify
+     the unsupported spelling without reflecting possible secret material. */
+  char invalid_config_entry[F2E_MAX_VALUE];
+  int has_invalid_config_entry;
 } F2EConfig;
 
 static int f2e_dotenv_path_containment(const char *relative_path);
@@ -1613,6 +1618,24 @@ static int f2e_load_commands_table(F2EConfig *config,
   return 1;
 }
 
+static void f2e_record_unknown_config_table(F2EConfig *config, const char *table) {
+  if (!config || config->has_invalid_config_entry) {
+    return;
+  }
+  snprintf(config->invalid_config_entry, sizeof(config->invalid_config_entry),
+           "unknown config table [%s]", table ? table : "");
+  config->has_invalid_config_entry = 1;
+}
+
+static void f2e_record_unknown_config_key(F2EConfig *config, const char *section, const char *key) {
+  if (!config || config->has_invalid_config_entry) {
+    return;
+  }
+  snprintf(config->invalid_config_entry, sizeof(config->invalid_config_entry),
+           "unknown key \"%s\" in [%s]", key ? key : "", section ? section : "root");
+  config->has_invalid_config_entry = 1;
+}
+
 static int f2e_load_config(const char *config_path, F2EConfig *config) {
   memset(config, 0, sizeof(*config));
   config->allow_separated_values = 1;
@@ -1711,6 +1734,7 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
       } else {
         current = NULL;
         section = F2E_SECTION_NONE;
+        f2e_record_unknown_config_table(config, table);
       }
       continue;
     }
@@ -1798,6 +1822,8 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
         if (f2e_parse_config_bool(value, &parsed)) {
           config->dotenv_override = parsed;
         }
+      } else {
+        f2e_record_unknown_config_key(config, "parse", key);
       }
       continue;
     }
@@ -1828,6 +1854,8 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
         } else {
           config->invalid_help_exclude_columns = 1;
         }
+      } else {
+        f2e_record_unknown_config_key(config, "help", key);
       }
       continue;
     }
@@ -1892,6 +1920,8 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
           config->default_order = order;
           config->default_order_set = 1;
         }
+      } else {
+        f2e_record_unknown_config_key(config, "env", key);
       }
       continue;
     }
@@ -1936,10 +1966,16 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
           command->allow_unknown = parsed;
           command->allow_unknown_set = 1;
         }
+      } else {
+        f2e_record_unknown_config_key(config, "commands.*", key);
       }
       continue;
     }
 
+    /* F2E_SECTION_NONE can mean an unknown table, which is already recorded
+       at the table header, or a structurally invalid commands table, which has
+       its own specific diagnostic. Do not manufacture a second root-key error
+       for the contents of either table. */
     if (section != F2E_SECTION_FLAG || !current) {
       continue;
     }
@@ -2010,6 +2046,8 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
       if (f2e_parse_bare_value(value, parsed, sizeof(parsed))) {
         f2e_strlcpy(current->help, parsed, sizeof(current->help));
       }
+    } else {
+      f2e_record_unknown_config_key(config, "flags.*", key);
     }
   }
 
@@ -3715,6 +3753,9 @@ static int f2e_shorts_spell_bundle(const F2EConfig *config, int scope, const cha
 }
 
 static void f2e_audit_config_semantics(const F2EConfig *config, F2EAudit *audit) {
+  if (config->has_invalid_config_entry) {
+    f2e_audit_add(audit, 1, "%s", config->invalid_config_entry);
+  }
   if (config->flag_count == 0 && config->command_count == 0) {
     f2e_audit_add(audit, 1, "no [flags.*] or [commands.*] tables declared");
     return;

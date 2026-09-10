@@ -1,0 +1,48 @@
+# Mirror of shared-auth/shared-auth-cli's DEN-606 CLI contract.
+# This is downstream regression evidence for flags-2-env, not the authority for
+# the Shared Auth CLI. Update it when that consumer changes its root contract.
+
+[parse]
+allow_unknown = false
+command_env = "SHARED_AUTH_COMMAND"
+unknown_options_env = "SHARED_AUTH_UNKNOWN_OPTIONS"
+errors_env = "SHARED_AUTH_PARSE_ERRORS"
+
+[flags.shared_auth_config]
+env = "SHARED_AUTH_CONFIG"
+aliases = ["config", "shared-auth-config"]
+type = "string"
+help = "Path to the project .shared-auth.toml policy file."
+
+[flags.api_base]
+env = "SHARED_AUTH_API_BASE"
+aliases = ["api-base"]
+type = "string"
+default = "http://127.0.0.1:8080"
+help = "API HTTP base URL."
+
+[flags.json]
+env = "SHARED_AUTH_JSON"
+aliases = ["json"]
+type = "bool"
+default = false
+true_aliases = ["true", "1", "yes"]
+false_aliases = ["false", "0", "no"]
+help = "Emit JSON."
+
+[flags.help]
+env = "SHARED_AUTH_HELP"
+aliases = ["help"]
+short = "h"
+type = "bool"
+default = false
+help = "Show help."
+
+[commands.health]
+help = "Check Shared Auth health."
+
+[commands.status]
+help = "Show Shared Auth status."
+
+[commands.help]
+help = "Show help."

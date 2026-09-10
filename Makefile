@@ -67,6 +67,7 @@ $(CLI): $(SRC) $(CONTEXT_SRC) $(CLI_SRC) $(HEADER) $(CONTEXT_HEADER) FORCE | $(B
 
 test: borrow-check readme-test parity-test $(PROCESS_SMOKE) $(API_HARDENING) $(ALLOCATION_FAILURE) $(TERMINAL_CONTEXT_TEST) $(DOTENV_API_TEST) $(HELP_UNICODE_TEST)
 	./tests/run.sh
+	bash ./tests/shared-auth-cli-consumer.sh
 	node --test tests/negation.test.mjs
 	$(API_HARDENING)
 	$(ALLOCATION_FAILURE) tests/subcommands-deep/.cli-flags.toml
@@ -144,4 +145,4 @@ prebuilt-manifest-verify: prebuilt-manifest
 prebuilt-manifest-selftest: prebuilt-manifest
 	python3 $(PREBUILT_MANIFEST) self-test --manifest build/manifest.json --artifact-root $(PREBUILT_STAGING)
 
-.PHONY: prebuilt-manifest prebuilt-manifest-verify prebuilt-manifest-selftest
+.PHONY: prebuilt-manifest prebuilt-verify prebuilt-manifest-selftest

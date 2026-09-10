@@ -11,6 +11,7 @@ import {
   generateTypes,
   parse,
 } from "./lib.mjs";
+import { runEnvManifestCli } from "./env-manifest.mjs";
 
 function usage(stream = process.stderr) {
   stream.write(
@@ -18,6 +19,10 @@ function usage(stream = process.stderr) {
       "  f2e [argv...]\n" +
       "  f2e audit [config]\n" +
       "  f2e audit env [config] [env]\n" +
+      "  f2e env-manifest check [root] [--manifest path] [--cli path] [--sops-all] [--dec-all]\n" +
+      "  f2e env-manifest sync [root] [--manifest path] [--cli path]\n" +
+      "  f2e env-manifest generate [root]\n" +
+      "  f2e env-manifest json [root]\n" +
       "  f2e generate <language> [config] [--name TypeName]\n" +
       "  f2e completion <bash|zsh> <command> [config]\n" +
       "  f2e completion install <bash|zsh> <command> [config]\n",
@@ -154,6 +159,13 @@ function main(argv) {
 
   if (["generate", "gen", "codegen"].includes(command)) {
     return runGenerate(rest);
+  }
+
+  // Repository env-manifest discovery is a build/audit command, not application
+  // argv. Dispatch before the native application-flag parser so this tooling
+  // does not become a second runtime option schema.
+  if (["env-manifest", "manifest-env"].includes(command)) {
+    return runEnvManifestCli(rest);
   }
 
   if (command) {

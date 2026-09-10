@@ -8,6 +8,8 @@ use std::{collections::BTreeMap, fmt};
 
 use crate::Flags2Env;
 
+pub mod domain_config;
+
 /// Deterministic environment snapshot. Prefer this over mutating process env.
 pub type EnvMap = BTreeMap<String, String>;
 
@@ -213,6 +215,10 @@ mod tests {
         let env = get_env_map(
             EnvMap::from([("FLAGS2ENV_ENV_MAP_PROBE".into(), "base".into())]),
             [("FLAGS2ENV_ENV_MAP_PROBE".into(), "override".into())],
+        );
+        assert_eq!(
+            env.get("PORT").map(String::as_str),
+            None
         );
         assert_eq!(
             env.get("FLAGS2ENV_ENV_MAP_PROBE").map(String::as_str),

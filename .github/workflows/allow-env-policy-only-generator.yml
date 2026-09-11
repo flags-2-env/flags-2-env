@@ -30,19 +30,19 @@ jobs:
 
           path = Path('src/parser.c')
           text = path.read_text(encoding='utf-8')
-          old = '''  if (config->flag_count == 0 && config->command_count == 0) {
-    f2e_audit_add(audit, 1, "no [flags.*] or [commands.*] tables declared");
-    return;
-  }
-
-'''
-          new = '''  /* A configuration may intentionally expose no argv surface at all.  This is
-     useful for env-only daemons and MCP/service processes whose application
-     boundary rejects every user-supplied option itself.  Keep auditing the
-     remaining parse/env/help policy instead of forcing a synthetic flag or
-     command that would falsely advertise a public CLI. */
-
-'''
+          old = (
+              '  if (config->flag_count == 0 && config->command_count == 0) {\n'
+              '    f2e_audit_add(audit, 1, "no [flags.*] or [commands.*] tables declared");\n'
+              '    return;\n'
+              '  }\n\n'
+          )
+          new = (
+              '  /* A configuration may intentionally expose no argv surface at all.  This is\n'
+              '     useful for env-only daemons and MCP/service processes whose application\n'
+              '     boundary rejects every user-supplied option itself.  Keep auditing the\n'
+              '     remaining parse/env/help policy instead of forcing a synthetic flag or\n'
+              '     command that would falsely advertise a public CLI. */\n\n'
+          )
           if text.count(old) != 1:
               raise SystemExit('expected exactly one zero-argv audit guard')
           path.write_text(text.replace(old, new), encoding='utf-8')

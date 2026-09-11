@@ -32,6 +32,24 @@ unsafe extern "C" {
         config_path: *const c_char,
         argv_json: *const c_char,
     ) -> *mut c_char;
+    fn f2e_is_help_requested_json_argv(argv_json: *const c_char) -> i32;
+    fn f2e_help_table_for_json_argv(
+        command_name: *const c_char,
+        argv_json: *const c_char,
+        terminal_columns: i32,
+    ) -> *mut c_char;
+    fn f2e_help_table_for_json_argv_from_file(
+        config_path: *const c_char,
+        command_name: *const c_char,
+        argv_json: *const c_char,
+        terminal_columns: i32,
+    ) -> *mut c_char;
+    fn f2e_completion_script(shell: *const c_char, command_name: *const c_char) -> *mut c_char;
+    fn f2e_completion_script_from_file(
+        config_path: *const c_char,
+        shell: *const c_char,
+        command_name: *const c_char,
+    ) -> *mut c_char;
     fn f2e_audit_config_status() -> i32;
     fn f2e_audit_config_status_from_file(config_path: *const c_char) -> i32;
     fn f2e_doctor_from_file(config_path: *const c_char) -> *mut c_char;
@@ -83,6 +101,90 @@ impl BundledFlags2Env {
         };
         let raw = take_owned_string(result).unwrap_or_else(|| "{}".to_string());
         Ok(serde_json::from_str(&raw)?)
+    }
+
+    /// Returns true only when argv contains the exact `--help` token.
+    ///
+    /// This delegates to the same native parser authority used by the bundled
+    /// CLI instead of making each Rust consumer implement its own help-token
+    /// scanner.
+    pub fn is_help_requested(&self, argv: &[String]) -> Result<bool, Box<dyn std::error::Error>> {
+        let argv_json = CString::new(serde_json::to_string(argv)?)?;
+        // SAFETY: argv_json is a valid NUL-terminated JSON array for the
+        // duration of the call; the C API does not retain the pointer.
+        Ok(unsafe { f2e_is_help_requested_json_argv(argv_json.as_ptr()) != 0 })
+    }
+
+    /// Renders the terminal-width-aware help table for the command scope
+    /// selected by `argv`.
+    ///
+    /// Passing `terminal_columns <= 0` preserves the native auto-detection
+    /// behavior. The returned string is owned Rust data; native allocation is
+    /// released before this method returns.
+    pub fn help_table_for_argv(
+        &self,
+        command_name: &str,
+        argv: &[String],
+        terminal_columns: i32,
+        config_path: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let command_name = CString::new(command_name)?;
+        let argv_json = CString::new(serde_json::to_string(argv)?)?;
+        let result = if let Some(config_path) = config_path {
+            let config_path = CString::new(config_path)?;
+            // SAFETY: all CStrings live through the call and the returned heap
+            // string is released by take_owned_string.
+            unsafe {
+                f2e_help_table_for_json_argv_from_file(
+                    config_path.as_ptr(),
+                    command_name.as_ptr(),
+                    argv_json.as_ptr(),
+                    terminal_columns,
+                )
+            }
+        } else {
+            // SAFETY: command_name and argv_json remain alive through the call;
+            // the returned heap string is released by take_owned_string.
+            unsafe {
+                f2e_help_table_for_json_argv(
+                    command_name.as_ptr(),
+                    argv_json.as_ptr(),
+                    terminal_columns,
+                )
+            }
+        };
+        take_owned_string(result)
+            .ok_or_else(|| "flags2env could not render help; check the config path".into())
+    }
+
+    /// Generates a static shell-completion script from the same
+    /// `.cli-flags.toml` authority used for parsing.
+    pub fn completion_script(
+        &self,
+        shell: &str,
+        command_name: &str,
+        config_path: Option<&str>,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let shell = CString::new(shell)?;
+        let command_name = CString::new(command_name)?;
+        let result = if let Some(config_path) = config_path {
+            let config_path = CString::new(config_path)?;
+            // SAFETY: all CStrings live through the call and the returned heap
+            // string is released by take_owned_string.
+            unsafe {
+                f2e_completion_script_from_file(
+                    config_path.as_ptr(),
+                    shell.as_ptr(),
+                    command_name.as_ptr(),
+                )
+            }
+        } else {
+            // SAFETY: shell and command_name remain alive through the call; the
+            // returned heap string is released by take_owned_string.
+            unsafe { f2e_completion_script(shell.as_ptr(), command_name.as_ptr()) }
+        };
+        take_owned_string(result)
+            .ok_or_else(|| "flags2env could not generate completion script".into())
     }
 
     /// Coerce declared environment values according to `.cli-flags.toml` and
@@ -341,12 +443,14 @@ env = "PORT"
 aliases = ["port"]
 type = "integer"
 default = 3000
+help = "TCP port for the app listener."
 
 [flags.debug]
 env = "DEBUG"
 aliases = ["debug"]
 type = "bool"
 default = false
+help = "Enable debug logging."
 
 [flags.ratio]
 env = "RATIO"
@@ -366,12 +470,14 @@ type = "map"
 
 [commands.serve]
 env = "COMMAND_SERVE"
+help = "Run the server."
 
 [commands.serve.flags.bind]
 env = "BIND_ADDR"
 aliases = ["bind"]
 type = "string"
 default = "127.0.0.1:8080"
+help = "Server bind address."
 "#,
         )
         .expect("write config");
@@ -410,6 +516,43 @@ default = "127.0.0.1:8080"
         assert_eq!(
             parsed.get("COMMAND_SERVE").map(String::as_str),
             Some("true")
+        );
+    }
+
+    #[test]
+    fn bundled_ui_helpers_use_native_command_scope() {
+        let dir = config();
+        let path = dir.path().join(".cli-flags.toml");
+        let parser = BundledFlags2Env::new();
+        let help_argv = vec!["app".to_string(), "serve".to_string(), "--help".to_string()];
+        let non_help_argv = vec!["app".to_string(), "--helpful".to_string()];
+
+        assert!(parser
+            .is_help_requested(&help_argv)
+            .expect("detect exact help token"));
+        assert!(!parser
+            .is_help_requested(&non_help_argv)
+            .expect("reject help prefix"));
+
+        let help = parser
+            .help_table_for_argv("app", &help_argv, 100, path.to_str())
+            .expect("render scoped help");
+        assert!(
+            help.contains("--bind"),
+            "scoped help omitted command flag: {help}"
+        );
+        assert!(
+            help.contains("--port"),
+            "scoped help omitted global flag: {help}"
+        );
+
+        let completion = parser
+            .completion_script("bash", "app", path.to_str())
+            .expect("generate bash completion");
+        assert!(completion.contains("serve"), "completion omitted command");
+        assert!(
+            completion.contains("--port"),
+            "completion omitted global flag"
         );
     }
 

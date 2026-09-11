@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -12,6 +12,29 @@ const allowedClientPrefixes = new Set([
 const allowedClientFiles = new Set([
   "clients/README.md",
 ]);
+
+const packageManifest = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+);
+const cliSource = readFileSync(
+  new URL("../clients/nodejs/cli.mjs", import.meta.url),
+  "utf8",
+);
+const forbiddenRepositoryAuditSurfaces = [
+  packageManifest.exports?.["./env-manifest"] && "package export ./env-manifest",
+  packageManifest.scripts?.["test:env-manifest"] && "package script test:env-manifest",
+  packageManifest.files?.includes("clients/nodejs/env-manifest.mjs") &&
+    "packaged clients/nodejs/env-manifest.mjs",
+  /(?:env-manifest|manifest-env)/u.test(cliSource) && "f2e env-manifest CLI command",
+].filter(Boolean);
+
+if (forbiddenRepositoryAuditSurfaces.length > 0) {
+  process.stderr.write(
+    "flags-2-env must stay scoped to .cli-flags.toml and its configured env files; " +
+      `repository-wide environment auditing belongs in ores-cli:\n${forbiddenRepositoryAuditSurfaces.join("\n")}\n`,
+  );
+  process.exit(1);
+}
 
 const cache = mkdtempSync(join(tmpdir(), "flags2env-npm-pack-"));
 const result = spawnSync("npm", ["pack", "--dry-run", "--json"], {
@@ -31,6 +54,7 @@ const forbiddenPatterns = [
   /^clients\/[^/]+\/Dockerfile$/,
   /^clients\/[^/]+\/test\./,
   /^clients\/nodejs\/build\//,
+  /^clients\/nodejs\/env-manifest(?:\.test)?\.mjs$/,
   /^clients\/nodejs\/package\.json\.ejs$/,
   /^clients\/nodejs\/binding\.gyp\.ejs$/,
   /^clients\/bun\/package\.json\.ejs$/,

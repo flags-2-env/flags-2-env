@@ -108,10 +108,7 @@ impl BundledFlags2Env {
     /// This delegates to the same native parser authority used by the bundled
     /// CLI instead of making each Rust consumer implement its own help-token
     /// scanner.
-    pub fn is_help_requested(
-        &self,
-        argv: &[String],
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    pub fn is_help_requested(&self, argv: &[String]) -> Result<bool, Box<dyn std::error::Error>> {
         let argv_json = CString::new(serde_json::to_string(argv)?)?;
         // SAFETY: argv_json is a valid NUL-terminated JSON array for the
         // duration of the call; the C API does not retain the pointer.
@@ -527,35 +524,36 @@ help = "Server bind address."
         let dir = config();
         let path = dir.path().join(".cli-flags.toml");
         let parser = BundledFlags2Env::new();
-        let help_argv = vec![
-            "app".to_string(),
-            "serve".to_string(),
-            "--help".to_string(),
-        ];
+        let help_argv = vec!["app".to_string(), "serve".to_string(), "--help".to_string()];
         let non_help_argv = vec!["app".to_string(), "--helpful".to_string()];
 
-        assert!(
-            parser
-                .is_help_requested(&help_argv)
-                .expect("detect exact help token")
-        );
-        assert!(
-            !parser
-                .is_help_requested(&non_help_argv)
-                .expect("reject help prefix")
-        );
+        assert!(parser
+            .is_help_requested(&help_argv)
+            .expect("detect exact help token"));
+        assert!(!parser
+            .is_help_requested(&non_help_argv)
+            .expect("reject help prefix"));
 
         let help = parser
             .help_table_for_argv("app", &help_argv, 100, path.to_str())
             .expect("render scoped help");
-        assert!(help.contains("--bind"), "scoped help omitted command flag: {help}");
-        assert!(help.contains("--port"), "scoped help omitted global flag: {help}");
+        assert!(
+            help.contains("--bind"),
+            "scoped help omitted command flag: {help}"
+        );
+        assert!(
+            help.contains("--port"),
+            "scoped help omitted global flag: {help}"
+        );
 
         let completion = parser
             .completion_script("bash", "app", path.to_str())
             .expect("generate bash completion");
         assert!(completion.contains("serve"), "completion omitted command");
-        assert!(completion.contains("--port"), "completion omitted global flag");
+        assert!(
+            completion.contains("--port"),
+            "completion omitted global flag"
+        );
     }
 
     #[test]

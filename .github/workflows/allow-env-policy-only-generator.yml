@@ -1,0 +1,104 @@
+name: Stage env-policy-only contract support
+
+on:
+  push:
+    branches: [fix/env-policy-only-contracts-20260911]
+    paths:
+      - .github/workflows/allow-env-policy-only-generator.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out exact generator head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Admit an intentionally empty argv surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('src/parser.c')
+          text = path.read_text(encoding='utf-8')
+          old = '''  if (config->flag_count == 0 && config->command_count == 0) {
+    f2e_audit_add(audit, 1, "no [flags.*] or [commands.*] tables declared");
+    return;
+  }
+
+'''
+          new = '''  /* A configuration may intentionally expose no argv surface at all.  This is
+     useful for env-only daemons and MCP/service processes whose application
+     boundary rejects every user-supplied option itself.  Keep auditing the
+     remaining parse/env/help policy instead of forcing a synthetic flag or
+     command that would falsely advertise a public CLI. */
+
+'''
+          if text.count(old) != 1:
+              raise SystemExit('expected exactly one zero-argv audit guard')
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+          mkdir -p clients/rust/tests
+          cat > clients/rust/tests/env_policy_only.rs <<'RS'
+          use std::fs;
+
+          use flags2env::BundledFlags2Env;
+
+          #[test]
+          fn env_policy_only_contract_is_auditable_without_fake_argv() {
+              let dir = tempfile::tempdir().expect("temporary directory");
+              let path = dir.path().join(".cli-flags.toml");
+              fs::write(
+                  &path,
+                  r#"
+          [env]
+          dotenv = false
+          files = []
+          ignore = ["SERVICE_TOKEN"]
+
+          [parse]
+          allow_unknown = false
+
+          [help]
+          url = "https://flags-2-env.github.io/flags-2-env"
+          "#,
+              )
+              .expect("write env-policy-only contract");
+
+              BundledFlags2Env::new()
+                  .audit_config(path.to_str())
+                  .expect("an intentionally empty argv surface must remain auditable");
+          }
+          RS
+
+          rm .github/workflows/allow-env-policy-only-generator.yml
+
+      - name: Prove native and Rust regressions before committing
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo fmt --all -- --check
+          cargo test -p flags2env --test env_policy_only
+          cargo test -p flags2env --all-targets
+
+      - name: Commit reviewed generated source change
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/parser.c clients/rust/tests/env_policy_only.rs .github/workflows/allow-env-policy-only-generator.yml
+          test "$(git diff --cached --name-only | sort)" = "$(printf '%s\n' '.github/workflows/allow-env-policy-only-generator.yml' 'clients/rust/tests/env_policy_only.rs' 'src/parser.c' | sort)"
+          git commit -m 'fix: admit env-policy-only contracts without fake argv'
+          git push origin HEAD:fix/env-policy-only-contracts-20260911

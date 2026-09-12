@@ -9,6 +9,7 @@ on:
       - ".zpkg.lock"
       - "Makefile"
       - "scripts/verify-shell-contract.py"
+      - "tests/test_shell_contract_verifier.py"
       - "src/**"
       - "tests/subcommands/.cli-flags.toml"
       - "tests/subcommands-deep/.cli-flags.toml"
@@ -21,6 +22,7 @@ on:
       - ".zpkg.lock"
       - "Makefile"
       - "scripts/verify-shell-contract.py"
+      - "tests/test_shell_contract_verifier.py"
       - "src/**"
       - "tests/subcommands/.cli-flags.toml"
       - "tests/subcommands-deep/.cli-flags.toml"
@@ -42,6 +44,15 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Verify exact candidate revision
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+
+      - name: Reject incomplete help evidence
+        run: python3 -m unittest tests/test_shell_contract_verifier.py
 
       - name: Install real shell runtimes
         shell: bash

@@ -10,6 +10,42 @@ keywords = ["cli", "flags", "environment", "polyglot"]
 vcs = "git"
 url = "https://github.com/flags-2-env/flags-2-env"
 
+# Package-level environment contract. `.cli-flags.toml` remains authoritative
+# for flag aliases and flag -> env normalization; this section declares the env
+# surface the package itself accepts so zed-pkg and ores-cli can validate it.
+[env]
+strict = true
+
+[[env.vars]]
+name = "FLAGS2ENV_CONFIG"
+type = "string"
+description = "Path to the .cli-flags.toml file."
+
+[[env.vars]]
+name = "FLAGS2ENV_NATIVE_LIB"
+type = "string"
+description = "Path to the native flags2env shared library."
+
+[[env.vars]]
+name = "FLAGS2ENV_NODE_ADDON"
+type = "string"
+description = "Path to the Node native addon."
+
+[[env.vars]]
+name = "FLAGS2ENV_RUNTIME"
+type = "string"
+description = "Runtime client target."
+
+[[env.vars]]
+name = "FLAGS2ENV_AUDIT"
+type = "boolean"
+description = "Enable client audit mode."
+
+[[env.vars]]
+name = "FLAGS2ENV_ALLOW_UNKNOWN"
+type = "boolean"
+description = "Allow unrecognized flags to pass through to downstream code."
+
 [publish]
 include_readme = true
 tag_format = "v{version}"

@@ -18,9 +18,12 @@ TEXT_EXTENSIONS = {
     ".py", ".js", ".mjs", ".cjs", ".ts", ".tsx", ".rs", ".go", ".dart", ".gleam",
     ".ex", ".exs", ".erl", ".hrl", ".java", ".kt", ".swift", ".nix", ".lock",
 }
-REF_PATTERNS = [
-    re.compile(r"(?:https?://github\.com/|git\+https://github\.com/|git@github\.com:)?ORESoftware/flags-2-env(?:\.git)?(?:@(?P<ref>[A-Za-z0-9._/-]+))?", re.I),
-]
+REF_PATTERN = re.compile(
+    r"(?:https?://github\.com/|git\+https://github\.com/|git@github\.com:)?"
+    r"ORESoftware/flags-2-env(?:\.git)?"
+    r"(?:(?:@|#|\?ref=)(?P<ref>[A-Za-z0-9._/-]+))?",
+    re.I,
+)
 
 
 def iter_files(root: Path):
@@ -39,6 +42,14 @@ def classify_ref(ref: str | None) -> str:
     return "forbidden_mutable_or_unpinned"
 
 
+def scan_text(text: str) -> list[tuple[str | None, str, str]]:
+    results = []
+    for match in REF_PATTERN.finditer(text):
+        ref = match.groupdict().get("ref")
+        results.append((ref, classify_ref(ref), match.group(0)))
+    return results
+
+
 def scan(root: Path, allow_paths: set[str]) -> list[dict]:
     findings: list[dict] = []
     for path in iter_files(root):
@@ -48,22 +59,19 @@ def scan(root: Path, allow_paths: set[str]) -> list[dict]:
         except (UnicodeDecodeError, OSError):
             continue
         for line_no, line in enumerate(text.splitlines(), 1):
-            for pattern in REF_PATTERNS:
-                for match in pattern.finditer(line):
-                    ref = match.groupdict().get("ref")
-                    classification = classify_ref(ref)
-                    if rel in allow_paths:
-                        classification = "allowlisted_documentation"
-                    findings.append({
-                        "path": rel,
-                        "line": line_no,
-                        "legacy_repository": LEGACY,
-                        "canonical_repository": CANONICAL,
-                        "reference": match.group(0),
-                        "ref": ref,
-                        "classification": classification,
-                        "remediation": "Use flags-2-env/flags-2-env for new references; retain historical owner only at an immutable 40-hex commit when reproducibility requires it.",
-                    })
+            for ref, classification, reference in scan_text(line):
+                if rel in allow_paths:
+                    classification = "allowlisted_documentation"
+                findings.append({
+                    "path": rel,
+                    "line": line_no,
+                    "legacy_repository": LEGACY,
+                    "canonical_repository": CANONICAL,
+                    "reference": reference,
+                    "ref": ref,
+                    "classification": classification,
+                    "remediation": "Use flags-2-env/flags-2-env for new references; retain the historical owner only at an immutable 40-hex commit when reproducibility requires it.",
+                })
     return findings
 
 
@@ -76,20 +84,18 @@ def load_allowlist(root: Path) -> set[str]:
 
 
 def run_self_test() -> int:
-    import tempfile
-    with tempfile.TemporaryDirectory() as temp:
-        root = Path(temp)
-        (root / "canonical.txt").write_text("https://github.com/flags-2-env/flags-2-env\n")
-        (root / "immutable.txt").write_text("https://github.com/ORESoftware/flags-2-env@0123456789abcdef0123456789abcdef01234567\n")
-        (root / "mutable.txt").write_text("https://github.com/ORESoftware/flags-2-env@main\n")
-        (root / "unpinned.txt").write_text("git+https://github.com/ORESoftware/flags-2-env.git\n")
-        findings = scan(root, set())
-        classes = sorted(item["classification"] for item in findings)
-        expected = sorted(["immutable_historical", "forbidden_mutable_or_unpinned", "forbidden_mutable_or_unpinned"])
-        if classes != expected:
-            print(json.dumps({"expected": expected, "actual": classes, "findings": findings}, indent=2), file=sys.stderr)
-            return 1
-    print("legacy-owner reference self-test: ok")
+    fixture = Path(__file__).resolve().parents[1] / "tests" / "legacy-owner-reference-cases.json"
+    data = json.loads(fixture.read_text(encoding="utf-8"))
+    failures = []
+    for case in data["cases"]:
+        matches = scan_text(case["text"])
+        actual = "no_finding" if not matches else matches[0][1]
+        if actual != case["expected"]:
+            failures.append({"name": case["name"], "expected": case["expected"], "actual": actual})
+    if failures:
+        print(json.dumps({"failures": failures}, indent=2), file=sys.stderr)
+        return 1
+    print(f"legacy-owner reference self-test: ok ({len(data['cases'])} cases)")
     return 0
 
 

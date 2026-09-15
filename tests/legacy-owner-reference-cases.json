@@ -1,0 +1,29 @@
+{
+  "cases": [
+    {
+      "name": "canonical",
+      "text": "https://github.com/flags-2-env/flags-2-env",
+      "expected": "no_finding"
+    },
+    {
+      "name": "immutable_historical",
+      "text": "https://github.com/ORESoftware/flags-2-env@0123456789abcdef0123456789abcdef01234567",
+      "expected": "immutable_historical"
+    },
+    {
+      "name": "mutable_main",
+      "text": "https://github.com/ORESoftware/flags-2-env@main",
+      "expected": "forbidden_mutable_or_unpinned"
+    },
+    {
+      "name": "unpinned_git_url",
+      "text": "git+https://github.com/ORESoftware/flags-2-env.git",
+      "expected": "forbidden_mutable_or_unpinned"
+    },
+    {
+      "name": "mutable_tag",
+      "text": "https://github.com/ORESoftware/flags-2-env@latest",
+      "expected": "forbidden_mutable_or_unpinned"
+    }
+  ]
+}

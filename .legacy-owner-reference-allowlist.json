@@ -1,8 +1,12 @@
 {
   "paths": [
+    "docs/legacy-owner-reference-audit.md",
+    "docs/source-migration.json",
+    "docs/source-migration.md",
+    "docs/source-migration.schema.json",
     "scripts/audit-legacy-owner-references.py",
-    "tests/legacy-owner-reference-cases.json",
-    "docs/legacy-owner-reference-audit.md"
+    "scripts/verify-source-migration.py",
+    "tests/legacy-owner-reference-cases.json"
   ],
-  "policy": "Only the scanner implementation, its fixtures, and its migration documentation may name the historical owner without being treated as a dependency finding. Runtime manifests, package metadata, workflows, submodules, and automation docs are not allowlisted."
+  "policy": "Only the scanner implementation/fixtures, dedicated historical-migration documentation, the machine-readable source-migration authority, and its verifier may name the historical owner. Runtime manifests, package metadata, ordinary workflows, client imports, and active consumer documentation are not allowlisted."
 }

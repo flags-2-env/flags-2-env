@@ -271,7 +271,7 @@ function testGo() {
   }
 
   const dir = makeSnippetProject("go");
-  write(join(dir, "go.mod"), `module readme_snippet\n\ngo 1.22\n\nrequire github.com/oresoftware/flags-2-env/clients/golang v0.0.0\n\nreplace github.com/oresoftware/flags-2-env/clients/golang => ${join(root, "clients", "golang")}\n`);
+  write(join(dir, "go.mod"), `module readme_snippet\n\ngo 1.22\n\nrequire github.com/flags-2-env/flags-2-env/clients/golang v0.0.0\n\nreplace github.com/flags-2-env/flags-2-env/clients/golang => ${join(root, "clients", "golang")}\n`);
   write(join(dir, "main.go"), snippet("Go"));
   write(join(dir, "main_test.go"), `
 package main

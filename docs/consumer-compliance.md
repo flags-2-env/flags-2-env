@@ -25,7 +25,7 @@ Pin `uses:` and `tooling_ref` to the same reviewed full commit SHA. `parser_ref`
 
 The canonical Git source is
 `https://github.com/flags-2-env/flags-2-env.git`. The original
-`https://github.com/ORESoftware/flags-2-env.git` source remains accepted through
+`https://github.com/flags-2-env/flags-2-env.git` source remains accepted through
 2026-08-19 so consumers can migrate without losing immutable pins. The policy
 checker rejects that compatibility URL after the cutoff; the canonical URL has
 no transition expiry.

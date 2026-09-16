@@ -3,7 +3,7 @@
 (version 0.1.0)
 (generate_opam_files true)
 (source
- (github ORESoftware/flags-2-env))
+ (github flags-2-env/flags-2-env))
 (license MIT)
 (authors ORESoftware)
 (package

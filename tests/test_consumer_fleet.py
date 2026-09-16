@@ -193,7 +193,7 @@ class ConsumerFleetTests(unittest.TestCase):
     def test_in_repo_evidence_must_match_the_consumer_repository(self) -> None:
         document = self.load()
         entry = self.in_repo_entry(document)
-        entry["evidence_pr"] = "https://github.com/ORESoftware/flags-2-env/pull/8"
+        entry["evidence_pr"] = "https://github.com/flags-2-env/flags-2-env/pull/8"
         result = self.run_document(document)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("does not match consumer", result.stderr)

@@ -2,7 +2,7 @@
 (name flags2env_reason)
 (version 0.1.0)
 (source
- (github ORESoftware/flags-2-env))
+ (github flags-2-env/flags-2-env))
 (license MIT)
 (authors ORESoftware)
 (package

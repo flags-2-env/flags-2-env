@@ -130,7 +130,7 @@ class ClientParserSyncTest(unittest.TestCase):
                     "clients/cpp/native/parser.c": CANONICAL_C,
                     "clients/cpp/native/parser.h": CANONICAL_H,
                     "build/parser.c": "/* stale build artifact */\n",
-                    ".vendor/.zed/oresoftware/flags-2-env/src/parser.c": "/* a dependency */\n",
+                    ".vendor/.zed/flags-2-env/flags-2-env/src/parser.c": "/* a dependency */\n",
                 },
             )
             result = self.run_script(root, min_copies=2)

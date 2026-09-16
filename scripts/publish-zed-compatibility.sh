@@ -5,7 +5,7 @@ usage() {
   cat <<'EOF'
 usage: publish-zed-compatibility.sh [--dry-run | --release]
 
-Publishes the temporary oresoftware/flags-2-env compatibility coordinate from
+Publishes the temporary flags-2-env/flags-2-env compatibility coordinate from
 the same tagged commit as the canonical flags-2-env/flags-2-env package.
 Defaults to --dry-run. Set ZED_BIN to select the reviewed zed executable.
 EOF
@@ -113,6 +113,6 @@ publish_args=(publish --allow-dirty)
 if [[ "$mode" == dry-run ]]; then
   publish_args+=(--dry-run)
 fi
-printf 'publishing oresoftware/flags-2-env@%s from source commit %s (%s)\n' \
+printf 'publishing flags-2-env/flags-2-env@%s from source commit %s (%s)\n' \
   "$package_version" "$commit" "$mode"
 (cd "$stage" && "$zed_bin" "${publish_args[@]}")

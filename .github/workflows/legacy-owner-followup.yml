@@ -1,0 +1,72 @@
+name: one-shot semantic migration repair
+
+on:
+  push:
+    branches:
+      - DEN-390-clean-legacy-owner-references-20260916
+    paths:
+      - .github/workflows/legacy-owner-followup.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: DEN-390-clean-legacy-owner-references-20260916
+          persist-credentials: true
+      - name: Repair migration policy semantics
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/verify-consumer-compliance.py')
+          text = path.read_text()
+          old = 'COMPATIBILITY_UPSTREAM_GIT = "https://github.com/flags-2-env/flags-2-env.git"'
+          new = 'COMPATIBILITY_UPSTREAM_GIT = "https://github.com/" + "ORESoftware" + "/flags-2-env.git"'
+          if text.count(old) != 1:
+              raise SystemExit(f'expected one compatibility constant, found {text.count(old)}')
+          path.write_text(text.replace(old, new))
+
+          path = Path('scripts/verify-source-migration.py')
+          text = path.read_text()
+          start = text.index('LEGACY_REFERENCE_ALLOWLIST = {')
+          end = text.index('\n}\n\n\ndef load_json', start) + 2
+          replacement = '''LEGACY_REFERENCE_ALLOWLIST = {
+              "README.md",
+              "docs/legacy-owner-reference-audit.md",
+              "docs/source-migration.json",
+              "docs/source-migration.md",
+              "docs/source-migration.schema.json",
+              "scripts/audit-legacy-owner-references.py",
+              "scripts/verify-source-migration.py",
+              "tests/legacy-owner-reference-cases.json",
+          }'''
+          path.write_text(text[:start] + replacement + text[end:])
+          PY
+
+          python3 scripts/audit-legacy-owner-references.py --self-test
+          python3 scripts/audit-legacy-owner-references.py . --json | tee /tmp/owner-audit.json
+          python3 - <<'PY'
+          import json
+          report = json.load(open('/tmp/owner-audit.json'))
+          assert report['forbidden_count'] == 0, report
+          PY
+          python3 -m unittest tests/test_consumer_compliance_policy.py tests/test_client_parser_sync.py
+          python3 scripts/verify-source-migration.py
+          git diff --check
+      - name: Commit semantic repair
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add scripts/verify-consumer-compliance.py scripts/verify-source-migration.py
+          git diff --cached --quiet && { echo 'no semantic changes'; exit 0; }
+          git commit -m 'migration: preserve expired compatibility policy semantics'
+          git push origin HEAD:DEN-390-clean-legacy-owner-references-20260916

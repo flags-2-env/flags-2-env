@@ -46,6 +46,7 @@
       "type": "object",
       "properties": {
         "env": { "type": "string" },
+        "argv": { "type": "boolean" },
         "aliases": { "type": "array", "items": { "type": "string" } },
         "short": { "type": "string" },
         "type": { "type": "string" },

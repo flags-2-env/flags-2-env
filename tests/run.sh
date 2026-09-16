@@ -1868,3 +1868,6 @@ else
 fi
 
 printf 'flags2env tests passed\n'
+
+# First-class env-only contract boundary.
+sh "$ROOT_DIR/tests/env-only/run.sh" "$CLI"

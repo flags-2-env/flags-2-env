@@ -1,0 +1,5 @@
+[flags.secret-toggle]
+env = "SECRET_TOGGLE"
+type = "bool"
+argv = false
+true_aliases = ["yes"]

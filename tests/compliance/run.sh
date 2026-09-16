@@ -4,6 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)"
 CHECKER="$ROOT_DIR/scripts/verify-consumer-compliance.py"
 PARSER_REF="377bff1a4e7424eb98377997a232ddc0fc700f59"
+LEGACY_UPSTREAM="https://github.com/"'ORESoftware'"/flags-2-env.git"
 TMP_DIR="${TMPDIR:-/tmp}/flags2env-compliance-$$"
 trap 'rm -rf "$TMP_DIR"' EXIT
 mkdir -p \
@@ -69,7 +70,7 @@ write_rust_files \
   "$TMP_DIR/legacy-good" \
   "$PARSER_REF" \
   "" \
-  "https://github.com/flags-2-env/flags-2-env.git"
+  "$LEGACY_UPSTREAM"
 python3 "$CHECKER" \
   --root "$TMP_DIR/legacy-good" \
   --contract .cli-flags.toml \

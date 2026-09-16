@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/flags-2-env/flags-2-env/contracts/cli-flags-config/authored.schema.json",
+  "$defs": {
+    "HelpConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "HelpConfig",
+      "type": "object",
+      "properties": {
+        "url": { "type": "string" },
+        "columns": { "type": "array", "items": { "type": "string" } },
+        "exclude": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "EnvConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "EnvConfig",
+      "type": "object",
+      "properties": {
+        "files": { "type": "array", "items": { "type": "string" } },
+        "load": { "type": "boolean" },
+        "ignore": { "type": "array", "items": { "type": "string" } }
+      },
+      "unevaluatedProperties": false
+    },
+    "ParseConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "ParseConfig",
+      "type": "object",
+      "properties": {
+        "require_equals": { "type": "boolean" },
+        "stop_at_first_positional": { "type": "boolean" },
+        "positionals_env": { "type": "string" },
+        "unknown_options_env": { "type": "string" },
+        "errors_env": { "type": "string" },
+        "command_env": { "type": "string" },
+        "allow_unknown": { "type": "boolean" },
+        "allow_hidden": { "type": "boolean" }
+      },
+      "unevaluatedProperties": false
+    },
+    "FlagSpec": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "FlagSpec",
+      "type": "object",
+      "properties": {
+        "env": { "type": "string" },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "short": { "type": "string" },
+        "type": { "type": "string" },
+        "default": {},
+        "help": { "type": "string" },
+        "description": { "type": "string" },
+        "true_aliases": { "type": "array", "items": { "type": "string" } },
+        "false_aliases": { "type": "array", "items": { "type": "string" } },
+        "requires_tty": {}
+      },
+      "unevaluatedProperties": false
+    },
+    "FlagMap": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "FlagMap",
+      "type": "object",
+      "properties": {},
+      "unevaluatedProperties": { "$ref": "FlagSpec" }
+    },
+    "CommandMap": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CommandMap",
+      "type": "object",
+      "properties": {},
+      "unevaluatedProperties": { "$ref": "CommandSpec" }
+    },
+    "CommandSpec": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CommandSpec",
+      "type": "object",
+      "properties": {
+        "help": { "type": "string" },
+        "description": { "type": "string" },
+        "aliases": { "type": "array", "items": { "type": "string" } },
+        "env": { "type": "string" },
+        "allow_unknown": { "type": "boolean" },
+        "allow_hidden": { "type": "boolean" },
+        "flags": { "$ref": "FlagMap" },
+        "commands": { "$ref": "CommandMap" },
+        "command": { "$ref": "CommandMap" },
+        "subcommands": { "$ref": "CommandMap" },
+        "subcommand": { "$ref": "CommandMap" }
+      },
+      "unevaluatedProperties": false
+    },
+    "GlobalConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "GlobalConfig",
+      "type": "object",
+      "properties": {
+        "flags": { "$ref": "FlagMap" }
+      },
+      "unevaluatedProperties": false
+    },
+    "CliFlagsConfig": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "CliFlagsConfig",
+      "type": "object",
+      "properties": {
+        "help": { "$ref": "HelpConfig" },
+        "env": { "$ref": "EnvConfig" },
+        "parse": { "$ref": "ParseConfig" },
+        "flags": { "$ref": "FlagMap" },
+        "global": { "$ref": "GlobalConfig" },
+        "commands": { "$ref": "CommandMap" },
+        "command": { "$ref": "CommandMap" },
+        "subcommands": { "$ref": "CommandMap" },
+        "subcommand": { "$ref": "CommandMap" }
+      },
+      "unevaluatedProperties": false
+    }
+  }
+}

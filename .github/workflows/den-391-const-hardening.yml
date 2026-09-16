@@ -24,9 +24,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(grep -Fc '    F2EFlag *flag = &config->flags[i];' src/parser.c)" -eq 1
-          sed -i 's/    F2EFlag \*flag = \&config->flags\[i\];/    const F2EFlag *flag = \&config->flags[i];/' src/parser.c
-          test "$(grep -Fc '    const F2EFlag *flag = &config->flags[i];' src/parser.c)" -ge 1
+          before="$(sed -n '/static void f2e_audit_config_semantics/,/^}/p' src/parser.c)"
+          printf '%s\n' "$before" | grep -F '    F2EFlag *flag = &config->flags[i];' >/dev/null
+          sed -i '/static void f2e_audit_config_semantics/,/^}/ s/    F2EFlag \*flag = \&config->flags\[i\];/    const F2EFlag *flag = \&config->flags[i];/' src/parser.c
+          after="$(sed -n '/static void f2e_audit_config_semantics/,/^}/p' src/parser.c)"
+          printf '%s\n' "$after" | grep -F '    const F2EFlag *flag = &config->flags[i];' >/dev/null
+          ! printf '%s\n' "$after" | grep -F '    F2EFlag *flag = &config->flags[i];' >/dev/null
           git diff --check
       - name: Compile and execute with warnings as errors
         shell: bash

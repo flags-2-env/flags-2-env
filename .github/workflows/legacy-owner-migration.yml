@@ -90,13 +90,19 @@ jobs:
           PY
 
           python3 scripts/audit-legacy-owner-references.py --self-test
+          set +e
           python3 scripts/audit-legacy-owner-references.py . --json > /tmp/legacy-owner-audit.json
+          audit_status=$?
+          set -e
+          cat /tmp/legacy-owner-audit.json
           python3 - <<'PY'
           import json
           report = json.load(open('/tmp/legacy-owner-audit.json'))
-          assert report['forbidden_count'] == 0, report
+          if report['forbidden_count'] != 0:
+              raise SystemExit(f"legacy owner migration still has {report['forbidden_count']} forbidden references")
           print(f"legacy owner migration clean: findings={len(report['findings'])} forbidden=0")
           PY
+          test "$audit_status" -eq 0
 
           git diff --check
           git status --short

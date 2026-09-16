@@ -14,6 +14,13 @@ type = "string"
 argv = false
 help = "Runtime database connection string."
 
+[flags.worker-concurrency]
+env = "WORKER_CONCURRENCY"
+type = "integer"
+default = 2
+argv = false
+help = "Runtime worker concurrency."
+
 [commands.worker]
 help = "Run the worker."
 

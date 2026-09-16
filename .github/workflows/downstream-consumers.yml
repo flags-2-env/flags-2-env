@@ -2,7 +2,7 @@ name: Downstream consumer fixtures
 
 # The twelve repositories in github.com/flags-2-env-test are real consumers of
 # this library: each declares the dependency in .zpkg.toml, vendors this repo at
-# .vendor/.zed/oresoftware/flags-2-env, and asserts the same six parse results
+# .vendor/.zed/flags-2-env/flags-2-env, and asserts the same six parse results
 # from its own runtime. This workflow rebuilds each of them against the commit
 # under review rather than against the commit they have pinned, so a change to
 # src/parser.c that silently alters the environment map fails here before it
@@ -201,25 +201,12 @@ jobs:
           import tomllib
 
           zed = tomllib.loads(pathlib.Path("fixture/.zpkg.toml").read_text())
-
-          # The compatibility window closed on 2026-08-19, so a fixture may
-          # declare either coordinate: the canonical one it should migrate to,
-          # or the legacy one it has not migrated yet. Pinning this to the
-          # legacy spelling alone made the migration itself a CI failure, which
-          # is the opposite of what the cutoff asks fixtures to do.
           CANONICAL = "flags-2-env/flags-2-env"
-          LEGACY = "oresoftware/flags-2-env"
 
           declared = list(zed["dependencies"])
-          if declared not in ([CANONICAL], [LEGACY]):
+          if declared != [CANONICAL]:
               raise SystemExit(
-                  f"unexpected dependency set: {declared}; expected exactly "
-                  f"[{CANONICAL!r}] or [{LEGACY!r}]"
-              )
-          if declared == [LEGACY]:
-              print(
-                  f"::warning::fixture still pins {LEGACY}; migrate it to {CANONICAL}",
-                  file=sys.stderr,
+                  f"unexpected dependency set: {declared}; expected exactly [{CANONICAL!r}]"
               )
 
           install_dir = zed["install"]["dir"]

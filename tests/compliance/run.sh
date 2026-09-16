@@ -69,7 +69,7 @@ write_rust_files \
   "$TMP_DIR/legacy-good" \
   "$PARSER_REF" \
   "" \
-  "https://github.com/ORESoftware/flags-2-env.git"
+  "https://github.com/flags-2-env/flags-2-env.git"
 python3 "$CHECKER" \
   --root "$TMP_DIR/legacy-good" \
   --contract .cli-flags.toml \

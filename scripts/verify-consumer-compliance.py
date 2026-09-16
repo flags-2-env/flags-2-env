@@ -82,7 +82,7 @@ EXACT_SECRET_ENVS = {
     "OTEL_EXPORTER_OTLP_TRACES_HEADERS",
 }
 CANONICAL_UPSTREAM_GIT = "https://github.com/flags-2-env/flags-2-env.git"
-COMPATIBILITY_UPSTREAM_GIT = "https://github.com/ORESoftware/flags-2-env.git"
+COMPATIBILITY_UPSTREAM_GIT = "https://github.com/flags-2-env/flags-2-env.git"
 COMPATIBILITY_SUPPORT_END = date(2026, 8, 19)
 
 

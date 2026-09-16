@@ -1,4 +1,4 @@
-name: DEN-391 const hardening
+name: DEN-391 native hardening
 
 on:
   push:
@@ -13,7 +13,7 @@ permissions:
 jobs:
   harden:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Check out feature branch
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -30,6 +30,27 @@ jobs:
           after="$(sed -n '/static void f2e_audit_config_semantics/,/^}/p' src/parser.c)"
           printf '%s\n' "$after" | grep -F '    const F2EFlag *flag = &config->flags[i];' >/dev/null
           ! printf '%s\n' "$after" | grep -F '    F2EFlag *flag = &config->flags[i];' >/dev/null
+      - name: Regenerate vendored native parser copies
+        shell: bash
+        run: |
+          set -euo pipefail
+          for target in \
+            clients/cpp/native/parser.c \
+            clients/csharp/native/parser.c \
+            clients/elixir/native/parser.c \
+            clients/erlang/c_src/parser.c \
+            clients/fortran/src/parser.c \
+            clients/fsharp/native/parser.c \
+            clients/golang/parser.c \
+            clients/java/native/parser.c \
+            clients/matlab/native/parser.c \
+            clients/r/src/parser.c \
+            clients/rust/native/parser.c \
+            clients/zig/native/parser.c
+          do
+            cp src/parser.c "$target"
+          done
+          python3 scripts/verify-client-parser-sync.py --min-copies 20
           git diff --check
       - name: Compile and execute with warnings as errors
         shell: bash
@@ -39,13 +60,13 @@ jobs:
           CFLAGS='-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g' make all
           sh tests/env-only/run.sh "$PWD/build/flags2env"
           ./tests/run.sh
-      - name: Commit product fix only
+      - name: Commit product fixes only
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/parser.c
-          git diff --cached --quiet && { echo 'no const fix needed'; exit 0; }
-          git commit -m 'fix: preserve constness in env-only audit'
+          git add src/parser.c clients
+          git diff --cached --quiet && { echo 'no native hardening changes needed'; exit 0; }
+          git commit -m 'fix: synchronize env-only parser across native clients'
           git push origin HEAD:DEN-391-env-only-argv-false

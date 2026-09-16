@@ -1,0 +1,48 @@
+name: DEN-391 const hardening
+
+on:
+  push:
+    branches:
+      - DEN-391-env-only-argv-false
+    paths:
+      - .github/workflows/den-391-const-hardening.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: DEN-391-env-only-argv-false
+          persist-credentials: true
+      - name: Preserve const correctness in audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(grep -Fc '    F2EFlag *flag = &config->flags[i];' src/parser.c)" -eq 1
+          sed -i 's/    F2EFlag \*flag = \&config->flags\[i\];/    const F2EFlag *flag = \&config->flags[i];/' src/parser.c
+          test "$(grep -Fc '    const F2EFlag *flag = &config->flags[i];' src/parser.c)" -ge 1
+          git diff --check
+      - name: Compile and execute with warnings as errors
+        shell: bash
+        run: |
+          set -euo pipefail
+          make clean
+          CFLAGS='-std=c99 -Wall -Wextra -Wpedantic -Werror -O1 -g' make all
+          sh tests/env-only/run.sh "$PWD/build/flags2env"
+          ./tests/run.sh
+      - name: Commit product fix only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/parser.c
+          git diff --cached --quiet && { echo 'no const fix needed'; exit 0; }
+          git commit -m 'fix: preserve constness in env-only audit'
+          git push origin HEAD:DEN-391-env-only-argv-false

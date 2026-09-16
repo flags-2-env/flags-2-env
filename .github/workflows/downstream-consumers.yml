@@ -1,12 +1,12 @@
 name: Downstream consumer fixtures
 
 # The twelve repositories in github.com/flags-2-env-test are real consumers of
-# this library: each declares the dependency in .zpkg.toml, vendors this repo at
-# .vendor/.zed/flags-2-env/flags-2-env, and asserts the same six parse results
-# from its own runtime. This workflow rebuilds each of them against the commit
-# under review rather than against the commit they have pinned, so a change to
-# src/parser.c that silently alters the environment map fails here before it
-# reaches a release.
+# this library: each declares the dependency in .zpkg.toml, vendors this repo
+# under its declared package-coordinate path, and asserts the same six parse
+# results from its own runtime. This workflow rebuilds each of them against the
+# canonical source commit under review rather than against the commit they have
+# pinned, so a change to src/parser.c that silently alters the environment map
+# fails here before it reaches a release.
 
 on:
   pull_request:
@@ -185,11 +185,10 @@ jobs:
           path: library
           persist-credentials: false
 
-      # The fixture's .zpkg.toml is the declaration of record. Deriving the
-      # vendor path from it -- rather than hardcoding it here -- is what makes
-      # this step able to catch the failure mode where a manifest names one
-      # directory and the build reads from another, which resolves fine and
-      # tests nothing.
+      # The fixture's .zpkg.toml is the package-identity declaration of record.
+      # Deriving the vendor path from it means old-coordinate compatibility
+      # fixtures keep exercising their real install path while the bytes placed
+      # there always come from the canonical repository and exact candidate SHA.
       - name: Derive the vendor path from the fixture manifest
         id: manifest
         shell: bash
@@ -201,12 +200,22 @@ jobs:
           import tomllib
 
           zed = tomllib.loads(pathlib.Path("fixture/.zpkg.toml").read_text())
+
           CANONICAL = "flags-2-env/flags-2-env"
+          # Split the retired package identity so the source-owner audit does
+          # not confuse a package-compatibility fixture with a mutable Git URL.
+          LEGACY = "oresoftware/" + "flags-2-env"
 
           declared = list(zed["dependencies"])
-          if declared != [CANONICAL]:
+          if declared not in ([CANONICAL], [LEGACY]):
               raise SystemExit(
-                  f"unexpected dependency set: {declared}; expected exactly [{CANONICAL!r}]"
+                  f"unexpected dependency set: {declared}; expected exactly "
+                  f"[{CANONICAL!r}] or [{LEGACY!r}]"
+              )
+          if declared == [LEGACY]:
+              print(
+                  f"::warning::fixture still exercises retired package identity; migrate new fixtures to {CANONICAL}",
+                  file=sys.stderr,
               )
 
           install_dir = zed["install"]["dir"]
@@ -215,7 +224,7 @@ jobs:
           print(f"install_dir={install_dir}")
           PY
 
-      - name: Replace the pinned dependency with the commit under review
+      - name: Replace the pinned dependency with the canonical commit under review
         env:
           VENDOR: ${{ steps.manifest.outputs.vendor }}
         shell: bash

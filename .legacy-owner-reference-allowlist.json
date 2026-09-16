@@ -1,8 +1,5 @@
 {
   "paths": [
-    ".github/workflows/den-3096-repair.yml",
-    ".github/workflows/downstream-consumers.yml",
-    ".github/workflows/legacy-owner-migration.yml",
     "docs/legacy-owner-reference-audit.md",
     "docs/source-migration.json",
     "docs/source-migration.md",
@@ -11,5 +8,5 @@
     "scripts/verify-source-migration.py",
     "tests/legacy-owner-reference-cases.json"
   ],
-  "policy": "Historical migration authorities may name the former owner. The three workflow paths are temporary migration exceptions and must be removed from this allowlist before merge. Runtime manifests, package metadata, client imports, and active consumer documentation are not allowlisted."
+  "policy": "Only the scanner implementation/fixtures, dedicated historical-migration documentation, the machine-readable source-migration authority, and its verifier may name the historical owner. Runtime manifests, package metadata, ordinary workflows, client imports, and active consumer documentation are not allowlisted."
 }

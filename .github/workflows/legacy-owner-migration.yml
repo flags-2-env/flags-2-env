@@ -89,30 +89,32 @@ jobs:
           allow.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
           PY
 
+          # This workflow is a one-shot migration mechanism and deliberately
+          # removes itself before the repository audit and final commit.
+          rm .github/workflows/legacy-owner-migration.yml
+
           python3 scripts/audit-legacy-owner-references.py --self-test
-          set +e
           python3 scripts/audit-legacy-owner-references.py . --json > /tmp/legacy-owner-audit.json
-          audit_status=$?
-          set -e
           cat /tmp/legacy-owner-audit.json
           python3 - <<'PY'
           import json
           report = json.load(open('/tmp/legacy-owner-audit.json'))
-          if report['forbidden_count'] != 0:
-              raise SystemExit(f"legacy owner migration still has {report['forbidden_count']} forbidden references")
+          assert report['forbidden_count'] == 0, report
           print(f"legacy owner migration clean: findings={len(report['findings'])} forbidden=0")
           PY
-          test "$audit_status" -eq 0
 
           git diff --check
           git status --short
-      - name: Commit migration result
+      - name: Commit migration result and remove helper
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md .legacy-owner-reference-allowlist.json tests clients scripts docs .github/workflows/downstream-consumers.yml .github/workflows/den-3096-repair.yml
+          git add README.md .legacy-owner-reference-allowlist.json tests clients scripts docs \
+            .github/workflows/downstream-consumers.yml \
+            .github/workflows/den-3096-repair.yml
+          git add -A .github/workflows/legacy-owner-migration.yml
           git diff --cached --quiet && { echo 'no migration changes'; exit 0; }
           git commit -m 'migration: eliminate mutable historical owner references'
           git push origin HEAD:DEN-390-clean-legacy-owner-references-20260916

@@ -1,0 +1,60 @@
+name: cli-flags contract
+
+on:
+  pull_request:
+    paths:
+      - '.cli-flags.toml'
+      - 'contracts/cli-flags-config/**'
+      - '.github/workflows/cli-flags-contract.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.cli-flags.toml'
+      - 'contracts/cli-flags-config/**'
+      - '.github/workflows/cli-flags-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  peer-authority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out flags2env exact head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Check out pinned TJSV authority tool
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/typespec-json-schema-validator
+          ref: 597adfaa662eb2a02d91c28c03ba5e2a46870821
+          path: .tools/tjsv
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '22.14.0'
+          cache: npm
+          cache-dependency-path: .tools/tjsv/package-lock.json
+      - name: Install pinned TJSV dependencies
+        working-directory: .tools/tjsv
+        run: npm ci
+      - name: Expose pinned TypeSpec toolchain to source imports
+        run: |
+          set -euo pipefail
+          test ! -e node_modules
+          ln -s .tools/tjsv/node_modules node_modules
+          test -f node_modules/@typespec/json-schema/package.json
+      - name: Build flags2env
+        run: make all
+      - name: Native semantic audit
+        run: build/flags2env audit .cli-flags.toml
+      - name: TypeSpec / JSON Schema parity and instance corpus
+        run: |
+          set -euo pipefail
+          node .tools/tjsv/bin/typespec-json-schema-validator.mjs check \
+            --typespec contracts/cli-flags-config/main.tsp \
+            --schema contracts/cli-flags-config/authored.schema.json \
+            --instances contracts/cli-flags-config/instances \
+            --report .typespec-json-schema-validator/cli-flags.report.json

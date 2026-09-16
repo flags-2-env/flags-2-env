@@ -1,0 +1,23 @@
+{
+  "help": {
+    "url": "https://github.com/flags-2-env/flags-2-env"
+  },
+  "flags": {
+    "config": {
+      "env": "FLAGS2ENV_CONFIG",
+      "aliases": ["config", "config-path", "cli-flags"],
+      "short": "c",
+      "type": "string",
+      "help": "Path to the .cli-flags.toml file."
+    },
+    "audit": {
+      "env": "FLAGS2ENV_AUDIT",
+      "aliases": ["audit"],
+      "short": "a",
+      "type": "bool",
+      "true_aliases": ["t", "1", "yes"],
+      "false_aliases": ["f", "0", "no"],
+      "help": "Enable client audit mode."
+    }
+  }
+}

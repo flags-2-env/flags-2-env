@@ -20,16 +20,13 @@ jobs:
         with:
           ref: DEN-391-env-only-argv-false
           persist-credentials: true
-      - name: Preserve const correctness in audit
+      - name: Verify const correctness in audit
         shell: bash
         run: |
           set -euo pipefail
-          before="$(sed -n '/static void f2e_audit_config_semantics/,/^}/p' src/parser.c)"
-          printf '%s\n' "$before" | grep -F '    F2EFlag *flag = &config->flags[i];' >/dev/null
-          sed -i '/static void f2e_audit_config_semantics/,/^}/ s/    F2EFlag \*flag = \&config->flags\[i\];/    const F2EFlag *flag = \&config->flags[i];/' src/parser.c
-          after="$(sed -n '/static void f2e_audit_config_semantics/,/^}/p' src/parser.c)"
-          printf '%s\n' "$after" | grep -F '    const F2EFlag *flag = &config->flags[i];' >/dev/null
-          ! printf '%s\n' "$after" | grep -F '    F2EFlag *flag = &config->flags[i];' >/dev/null
+          block="$(sed -n '/static void f2e_audit_config_semantics/,/^}/p' src/parser.c)"
+          printf '%s\n' "$block" | grep -F '    const F2EFlag *flag = &config->flags[i];' >/dev/null
+          ! printf '%s\n' "$block" | grep -F '    F2EFlag *flag = &config->flags[i];' >/dev/null
       - name: Regenerate vendored native parser copies
         shell: bash
         run: |
@@ -66,7 +63,7 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add src/parser.c clients
-          git diff --cached --quiet && { echo 'no native hardening changes needed'; exit 0; }
+          git add clients
+          git diff --cached --quiet && { echo 'vendored parser copies already synchronized'; exit 0; }
           git commit -m 'fix: synchronize env-only parser across native clients'
           git push origin HEAD:DEN-391-env-only-argv-false

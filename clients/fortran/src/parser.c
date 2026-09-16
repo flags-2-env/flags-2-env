@@ -135,6 +135,11 @@ typedef struct {
   int has_default;
   char default_value[F2E_MAX_VALUE];
   char help[F2E_MAX_VALUE];
+  /* argv=false keeps the typed/env contract while removing CLI presentation. */
+  int argv_enabled;
+  int argv_set;
+  int invalid_argv;
+  int aliases_explicit;
   int dotenv_override;     /* this key's .env value outranks the live environment */
   int dotenv_override_set; /* the flag declared it, so [env] override does not apply */
   /* requires_tty: the flag only means something with a terminal attached.
@@ -573,6 +578,7 @@ static F2EFlag *f2e_add_flag(F2EConfig *config, const char *name) {
   F2EFlag *flag = &config->flags[config->flag_count++];
   memset(flag, 0, sizeof(*flag));
   flag->type = F2E_TYPE_STRING;
+  flag->argv_enabled = 1;
   flag->command = F2E_SCOPE_ROOT;
   f2e_strlcpy(flag->name, name, sizeof(flag->name));
   f2e_add_alias(flag, name);
@@ -1985,7 +1991,16 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
       if (f2e_parse_bare_value(value, parsed, sizeof(parsed))) {
         f2e_strlcpy(current->env, parsed, sizeof(current->env));
       }
+    } else if (f2e_streq(key, "argv")) {
+      int parsed = 0;
+      current->argv_set = 1;
+      if (f2e_parse_config_bool(value, &parsed)) {
+        current->argv_enabled = parsed;
+      } else {
+        current->invalid_argv = 1;
+      }
     } else if (f2e_streq(key, "aliases")) {
+      current->aliases_explicit = 1;
       f2e_parse_aliases(current, value);
     } else if (f2e_streq(key, "true_aliases")) {
       f2e_parse_true_aliases(current, value);
@@ -3316,6 +3331,17 @@ static void f2e_report_unusable_token(F2EConfig *config, int scope, const char *
   }
 }
 
+static void f2e_report_env_only_argv(F2EJsonList *errors, const F2EFlag *flag) {
+  if (!errors || !flag) {
+    return;
+  }
+  char message[512];
+  snprintf(message, sizeof(message),
+           "flags.%s is env-only (argv = false) and cannot be set via argv",
+           f2e_audit_flag_name(flag));
+  f2e_json_list_append(errors, message);
+}
+
 static void f2e_apply_long_arg(F2EConfig *config, int scope, F2EPair *pairs, size_t pair_count, const char *token, int *index, int argc, const char *const argv[], F2EJsonList *errors) {
   char name[F2E_MAX_NAME];
   char inline_value[F2E_MAX_VALUE];
@@ -3351,6 +3377,10 @@ static void f2e_apply_long_arg(F2EConfig *config, int scope, F2EPair *pairs, siz
   if (!flag) {
     flag = f2e_find_negated_bool(config, scope, name, &bang_form);
     negated = flag != NULL;
+  }
+  if (flag && !flag->argv_enabled) {
+    f2e_report_env_only_argv(errors, flag);
+    return;
   }
   if (flag && bang_form && has_inline_value) {
     f2e_json_list_append(errors,
@@ -3407,6 +3437,10 @@ static int f2e_apply_short_arg(F2EConfig *config, int scope, F2EPair *pairs, siz
   char short_name = token[1];
   F2EFlag *first = f2e_find_flag_by_short(config, scope, short_name);
   if (!first || first->env[0] == '\0') {
+    return 1;
+  }
+  if (!first->argv_enabled) {
+    f2e_report_env_only_argv(errors, first);
     return 1;
   }
 
@@ -3927,10 +3961,28 @@ static void f2e_audit_config_semantics(const F2EConfig *config, F2EAudit *audit)
     f2e_audit_add(audit, 1, "env.ignore must be a list of env var names");
   }
   for (size_t i = 0; i < config->flag_count; i++) {
-    if (config->flags[i].invalid_requires_tty) {
+    const F2EFlag *flag = &config->flags[i];
+    if (flag->invalid_requires_tty) {
       f2e_audit_add(audit, 1,
                     "flags.%s requires_tty must be true, false, prompt, stdin, stdout, or stderr",
-                    f2e_audit_flag_name(&config->flags[i]));
+                    f2e_audit_flag_name(flag));
+    }
+    if (flag->invalid_argv) {
+      f2e_audit_add(audit, 1, "flags.%s argv must be true or false", f2e_audit_flag_name(flag));
+    }
+    if (!flag->argv_enabled) {
+      if (flag->aliases_explicit) {
+        f2e_audit_add(audit, 1, "flags.%s argv = false cannot declare aliases", f2e_audit_flag_name(flag));
+      }
+      if (flag->short_declared[0] != '\0') {
+        f2e_audit_add(audit, 1, "flags.%s argv = false cannot declare short", f2e_audit_flag_name(flag));
+      }
+      if (flag->true_alias_count > 0 || flag->false_alias_count > 0) {
+        f2e_audit_add(audit, 1, "flags.%s argv = false cannot declare boolean value aliases", f2e_audit_flag_name(flag));
+      }
+      if (flag->requires_tty != F2E_TTY_NONE) {
+        f2e_audit_add(audit, 1, "flags.%s argv = false cannot require a tty", f2e_audit_flag_name(flag));
+      }
     }
   }
   if (config->invalid_dotenv_files) {
@@ -7712,6 +7764,9 @@ static size_t f2e_help_collect_scope_flags(const F2EConfig *config, int scope, s
   for (;;) {
     for (size_t i = 0; i < config->flag_count && count < F2E_MAX_FLAGS; i++) {
       const F2EFlag *flag = &config->flags[i];
+      if (!flag->argv_enabled) {
+        continue;
+      }
       if (flag->command != level) {
         continue;
       }

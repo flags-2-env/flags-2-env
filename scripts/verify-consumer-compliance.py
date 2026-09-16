@@ -3,8 +3,8 @@
 
 The canonical C audit remains the source of truth for contract syntax and parser
 semantics. This companion check enforces cross-repository adoption policy:
-immutable pins, strict unknown-option handling, secret-only environment
-variables staying out of the flag surface, and trusted contract discovery for
+immutable pins, strict unknown-option handling, secret-bearing environment
+variables requiring argv=false, and trusted contract discovery for
 long-running Rust processes.
 """
 
@@ -91,6 +91,7 @@ class Flag:
     path: str
     env: str
     default_present: bool
+    argv_enabled: bool = True
 
 
 def fail(message: str) -> None:
@@ -152,7 +153,12 @@ def iter_flag_tables(container: Any, prefix: str) -> Iterable[Flag]:
                 continue
             env = spec.get("env")
             if isinstance(env, str):
-                yield Flag(f"{prefix}flags.{name}", env, "default" in spec)
+                yield Flag(
+                    f"{prefix}flags.{name}",
+                    env,
+                    "default" in spec,
+                    spec.get("argv", True) is not False,
+                )
     commands = container.get("commands", {})
     if isinstance(commands, dict):
         for name, command in commands.items():
@@ -542,9 +548,9 @@ def main() -> int:
         if previous != flag.path:
             errors.append(f"{flag.path} and {previous} both map to {flag.env}")
         secret_bearing = is_secret_bearing_env(flag.env)
-        if secret_bearing:
+        if secret_bearing and flag.argv_enabled:
             errors.append(
-                f"{flag.path} exposes secret-bearing env {flag.env}; keep it environment-only"
+                f"{flag.path} exposes secret-bearing env {flag.env} to argv; declare argv = false"
             )
         if flag.default_present and secret_bearing:
             errors.append(

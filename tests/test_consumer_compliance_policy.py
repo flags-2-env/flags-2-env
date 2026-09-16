@@ -76,6 +76,24 @@ class ConsumerCompliancePolicyTests(unittest.TestCase):
             with self.subTest(env=env):
                 self.assertTrue(MODULE.is_secret_bearing_env(env))
 
+    def test_env_only_secret_flag_metadata_is_preserved(self) -> None:
+        [flag] = list(
+            MODULE.iter_flag_tables(
+                {
+                    "flags": {
+                        "database": {
+                            "env": "DATABASE_URL",
+                            "type": "string",
+                            "argv": False,
+                        }
+                    }
+                },
+                "",
+            )
+        )
+        self.assertFalse(flag.argv_enabled)
+        self.assertTrue(MODULE.is_secret_bearing_env(flag.env))
+
     def test_long_running_rust_consumer_cannot_load_contract_from_cwd(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

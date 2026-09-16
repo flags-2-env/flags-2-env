@@ -79,15 +79,13 @@ def today() -> date:
     return date.today()
 LEGACY_REFERENCE_ALLOWLIST = {
     "README.md",
+    "docs/legacy-owner-reference-audit.md",
     "docs/source-migration.json",
     "docs/source-migration.md",
     "docs/source-migration.schema.json",
-    "docs/consumer-compliance.md",
-    "scripts/verify-consumer-compliance.py",
+    "scripts/audit-legacy-owner-references.py",
     "scripts/verify-source-migration.py",
-    "tests/compliance/run.sh",
-    "tests/test_consumer_fleet.py",
-    "tests/test_consumer_compliance_policy.py",
+    "tests/legacy-owner-reference-cases.json",
 }
 
 

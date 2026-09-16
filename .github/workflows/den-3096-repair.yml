@@ -17,7 +17,7 @@ concurrency:
 jobs:
   repair:
     if: >-
-      github.repository == 'ORESoftware/flags-2-env' &&
+      github.repository == 'flags-2-env/flags-2-env' &&
       github.ref == 'refs/heads/feat/custom-borrow-checker'
     runs-on: ubuntu-24.04
     timeout-minutes: 20

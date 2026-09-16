@@ -43,7 +43,7 @@ printf '%s\n' "$out" | grep -F 'env-only (argv = false)' >/dev/null
 ! printf '%s\n' "$out" | grep -F 'nats-secret' >/dev/null
 
 # Contradictory argv-only metadata is a configuration error.
-for bad in invalid-alias.toml invalid-short.toml invalid-bool-alias.toml invalid-argv.toml; do
+for bad in invalid-alias.toml invalid-short.toml invalid-bool-alias.toml invalid-tty.toml invalid-argv.toml; do
   if "$CLI" audit "$DIR/$bad" >"$DIR/$bad.out" 2>&1; then
     echo "expected audit failure for $bad" >&2
     exit 1
@@ -52,6 +52,7 @@ done
 grep -F 'argv = false cannot declare aliases' "$DIR/invalid-alias.toml.out" >/dev/null
 grep -F 'argv = false cannot declare short' "$DIR/invalid-short.toml.out" >/dev/null
 grep -F 'argv = false cannot declare boolean value aliases' "$DIR/invalid-bool-alias.toml.out" >/dev/null
+grep -F 'argv = false cannot require a tty' "$DIR/invalid-tty.toml.out" >/dev/null
 grep -F 'argv must be true or false' "$DIR/invalid-argv.toml.out" >/dev/null
 rm -f "$DIR"/*.out
 

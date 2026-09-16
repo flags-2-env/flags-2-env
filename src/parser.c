@@ -3961,7 +3961,7 @@ static void f2e_audit_config_semantics(const F2EConfig *config, F2EAudit *audit)
     f2e_audit_add(audit, 1, "env.ignore must be a list of env var names");
   }
   for (size_t i = 0; i < config->flag_count; i++) {
-    F2EFlag *flag = &config->flags[i];
+    const F2EFlag *flag = &config->flags[i];
     if (flag->invalid_requires_tty) {
       f2e_audit_add(audit, 1,
                     "flags.%s requires_tty must be true, false, prompt, stdin, stdout, or stderr",

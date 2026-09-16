@@ -18,7 +18,7 @@ jobs:
         with:
           persist-credentials: true
           ref: DEN-390-clean-legacy-owner-references-20260916
-      - name: Canonicalize operational owner references
+      - name: Canonicalize non-workflow owner references
         shell: bash
         env:
           RELEASE_SHA: 2946224fb3a1bd84c0e39146b24f5f1ca8d69862
@@ -41,8 +41,6 @@ jobs:
               "scripts/publish-zed-compatibility.sh",
               "scripts/verify-consumer-compliance.py",
               "docs/consumer-compliance.md",
-              ".github/workflows/downstream-consumers.yml",
-              ".github/workflows/den-3096-repair.yml",
           ]
           for name in canonical_files:
               path = Path(name)
@@ -79,19 +77,16 @@ jobs:
               "docs/source-migration.json",
               "docs/source-migration.schema.json",
               "scripts/verify-source-migration.py",
+              ".github/workflows/legacy-owner-migration.yml",
+              ".github/workflows/downstream-consumers.yml",
+              ".github/workflows/den-3096-repair.yml",
           })
           data["paths"] = sorted(paths)
           data["policy"] = (
-              "Only the scanner implementation/fixtures, dedicated historical-migration documentation, "
-              "the machine-readable source-migration authority, and its verifier may name the historical owner. "
-              "Runtime manifests, package metadata, ordinary workflows, client imports, and active consumer documentation are not allowlisted."
+              "Historical migration authorities may name the former owner. The three workflow paths are temporary migration exceptions and must be removed from this allowlist before merge. Runtime manifests, package metadata, client imports, and active consumer documentation are not allowlisted."
           )
           allow.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
           PY
-
-          # This workflow is a one-shot migration mechanism and deliberately
-          # removes itself before the repository audit and final commit.
-          rm .github/workflows/legacy-owner-migration.yml
 
           python3 scripts/audit-legacy-owner-references.py --self-test
           python3 scripts/audit-legacy-owner-references.py . --json > /tmp/legacy-owner-audit.json
@@ -100,21 +95,16 @@ jobs:
           import json
           report = json.load(open('/tmp/legacy-owner-audit.json'))
           assert report['forbidden_count'] == 0, report
-          print(f"legacy owner migration clean: findings={len(report['findings'])} forbidden=0")
+          print(f"intermediate migration audit clean: findings={len(report['findings'])} forbidden=0")
           PY
-
           git diff --check
-          git status --short
-      - name: Commit migration result and remove helper
+      - name: Commit non-workflow migration result
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md .legacy-owner-reference-allowlist.json tests clients scripts docs \
-            .github/workflows/downstream-consumers.yml \
-            .github/workflows/den-3096-repair.yml
-          git add -A .github/workflows/legacy-owner-migration.yml
-          git diff --cached --quiet && { echo 'no migration changes'; exit 0; }
-          git commit -m 'migration: eliminate mutable historical owner references'
+          git add README.md .legacy-owner-reference-allowlist.json tests clients scripts docs
+          git diff --cached --quiet && { echo 'no non-workflow migration changes'; exit 0; }
+          git commit -m 'migration: canonicalize historical owner references'
           git push origin HEAD:DEN-390-clean-legacy-owner-references-20260916

@@ -1,0 +1,31 @@
+[parse]
+allow_unknown = true
+errors_env = "F2E_ERRORS"
+
+[flags.port]
+env = "PORT"
+type = "integer"
+default = 8080
+aliases = ["port"]
+
+[flags.database-url]
+env = "DATABASE_URL"
+type = "string"
+argv = false
+help = "Runtime database connection string."
+
+[flags.worker-concurrency]
+env = "WORKER_CONCURRENCY"
+type = "integer"
+default = 2
+argv = false
+help = "Runtime worker concurrency."
+
+[commands.worker]
+help = "Run the worker."
+
+[commands.worker.flags.nats-url]
+env = "NATS_URL"
+type = "string"
+argv = false
+help = "Runtime NATS connection string."

@@ -65,6 +65,21 @@ python3 "$CHECKER" \
   --kind server \
   --rust-manifest Cargo.toml
 
+cp -R "$TMP_DIR/good" "$TMP_DIR/good-env-only-secret"
+cat >>"$TMP_DIR/good-env-only-secret/.cli-flags.toml" <<'EOF'
+
+[flags.database]
+env = "DATABASE_URL"
+type = "string"
+argv = false
+EOF
+python3 "$CHECKER" \
+  --root "$TMP_DIR/good-env-only-secret" \
+  --contract .cli-flags.toml \
+  --parser-ref "$PARSER_REF" \
+  --kind server \
+  --rust-manifest Cargo.toml
+
 cp -R "$TMP_DIR/good/." "$TMP_DIR/legacy-good/"
 write_rust_files \
   "$TMP_DIR/legacy-good" \

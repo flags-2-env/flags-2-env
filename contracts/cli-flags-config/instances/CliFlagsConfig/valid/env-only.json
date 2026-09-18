@@ -1,0 +1,21 @@
+{
+  "flags": {
+    "database-url": {
+      "env": "DATABASE_URL",
+      "argv": false,
+      "type": "string",
+      "help": "Runtime database connection string."
+    }
+  },
+  "commands": {
+    "worker": {
+      "flags": {
+        "nats-url": {
+          "env": "NATS_URL",
+          "argv": false,
+          "type": "string"
+        }
+      }
+    }
+  }
+}

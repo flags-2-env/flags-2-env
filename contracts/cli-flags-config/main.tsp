@@ -32,6 +32,7 @@ model ParseConfig {
 @id("FlagSpec")
 model FlagSpec {
   env?: string;
+  argv?: boolean;
   aliases?: string[];
   short?: string;
   type?: string;

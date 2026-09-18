@@ -1,0 +1,4 @@
+[flags.database-url]
+env = "DATABASE_URL"
+type = "string"
+argv = "sometimes"

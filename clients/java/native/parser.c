@@ -240,7 +240,8 @@ typedef enum {
   F2E_SECTION_HELP = 3,
   F2E_SECTION_ENV_AUDIT = 4,
   F2E_SECTION_COMMAND = 5,
-  F2E_SECTION_ORDER = 6
+  F2E_SECTION_ORDER = 6,
+  F2E_SECTION_IDENTITY = 7
 } F2EConfigSection;
 
 typedef enum {
@@ -1729,6 +1730,15 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
                  f2e_streq(table, "dotenv")) {
         current = NULL;
         section = F2E_SECTION_ENV_AUDIT;
+      } else if (f2e_streq(table, "identity")) {
+        /* Code-generation metadata. The runtime parser owns argv and the
+           environment; it does not own the names a generator gives to the
+           types it emits. `f2e generate` reads [identity] service/type_name to
+           name the generated env type and emit the SERVICE constant, so this
+           table is authored input for a peer tool, not a typo. Recognize it,
+           validate its keys, and otherwise ignore it at runtime. */
+        current = NULL;
+        section = F2E_SECTION_IDENTITY;
       } else if (f2e_streq(table, "order-of-preference") ||
                  f2e_streq(table, "order_of_preference") ||
                  f2e_streq(table, "order-of-precedence") ||
@@ -1830,6 +1840,17 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
         }
       } else {
         f2e_record_unknown_config_key(config, "parse", key);
+      }
+      continue;
+    }
+
+    if (section == F2E_SECTION_IDENTITY) {
+      /* Consumed by the code generator, not by argv or environment
+         resolution. Keys are still checked so a typo is not silently
+         dropped into a generated type name. */
+      if (!f2e_streq(key, "service") && !f2e_streq(key, "type_name") &&
+          !f2e_streq(key, "type-name") && !f2e_streq(key, "name")) {
+        f2e_record_unknown_config_key(config, "identity", key);
       }
       continue;
     }

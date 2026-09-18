@@ -157,6 +157,60 @@ pub struct ResolvedCommands {
     pub label: String,
 }
 
+/// A parsed `.cli-flags.toml` contract audit report.
+///
+/// Findings name config tables, keys and flag names only — never a value read
+/// from argv, the environment, or a `.env` file — so a service that refuses to
+/// start may log the whole report without leaking a secret.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AuditReport {
+    /// True only when the auditor reported zero error-level findings.
+    pub ok: bool,
+    /// Error-level findings. Each one on its own blocks the config.
+    pub errors: Vec<String>,
+    /// Advisory findings that do not block the config.
+    pub warnings: Vec<String>,
+}
+
+impl AuditReport {
+    /// True when nothing error-level was found.
+    pub fn passed(&self) -> bool {
+        self.ok && self.errors.is_empty()
+    }
+
+    /// Every error-level finding on one line, for an operator log.
+    pub fn error_summary(&self) -> String {
+        if self.errors.is_empty() {
+            "the auditor reported no reason".to_owned()
+        } else {
+            self.errors.join("; ")
+        }
+    }
+}
+
+/// The error [`BundledFlags2Env::audit_config`] returns when the contract is
+/// rejected.
+///
+/// It carries the full [`AuditReport`], so a caller can print
+/// [`AuditReport::error_summary`] or inspect the findings individually instead
+/// of collapsing the failure to an opaque status code.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuditFailed {
+    pub report: AuditReport,
+}
+
+impl fmt::Display for AuditFailed {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "flags2env contract audit failed: {}",
+            self.report.error_summary()
+        )
+    }
+}
+
+impl std::error::Error for AuditFailed {}
+
 fn json_string_vec(value: Option<&serde_json::Value>) -> Vec<String> {
     value
         .and_then(|value| value.as_array())

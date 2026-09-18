@@ -863,10 +863,10 @@ type = "string"
         );
     }
 
-    /// Findings describe the contract file, never a value from argv, the
-    /// environment, or a `.env`, so a refusing service can log them.
+    /// An unknown table is reported by NAME, so nothing under it is echoed.
+    /// This is the shape most findings have.
     #[test]
-    fn findings_do_not_reflect_values() {
+    fn an_unknown_table_is_reported_without_its_contents() {
         let report = assert_report_matches_status(&format!(
             "[identity]\nname = \"do-not-echo-this-value\"\n{MINIMAL}"
         ));
@@ -876,5 +876,111 @@ type = "string"
             "audit reflected a config value: {}",
             report.error_summary()
         );
+    }
+
+    /// The finding families that DO reproduce an operand, and the redaction
+    /// that keeps them out of a log.
+    ///
+    /// The previous version of this test asserted "findings never reflect
+    /// values" using an unknown TABLE, which structurally cannot contain a
+    /// value — it passed for the wrong reason. These cases were verified
+    /// against the native auditor: it really does quote the `default` value
+    /// and the config path.
+    #[test]
+    fn a_default_value_is_echoed_raw_but_never_by_the_error_a_caller_renders() {
+        const SECRET: &str = "postgres://user:SUPER_SECRET@db/app";
+        let report = assert_report_matches_status(&format!(
+            "[flags.port]\nenv = \"APP_PORT\"\naliases = [\"port\"]\ntype = \"int\"\ndefault = \"{SECRET}\"\n"
+        ));
+        assert!(!report.passed());
+        // The auditor's raw text really does carry it.
+        assert!(
+            report.error_summary().contains(SECRET),
+            "premise changed, the auditor no longer quotes the default: {}",
+            report.error_summary()
+        );
+        // The redacted form does not, and still names the construct.
+        let redacted = report.redacted_error_summary();
+        assert!(
+            !redacted.contains(SECRET),
+            "the redacted summary echoed the default: {redacted}"
+        );
+        assert!(
+            redacted.contains("flags.port default \"<redacted-value>\" is not a valid integer"),
+            "redaction lost the diagnostic: {redacted}"
+        );
+        // And that is what a caller doing `format!("{error}")` gets.
+        let rendered = AuditFailed { report }.to_string();
+        assert!(
+            !rendered.contains(SECRET),
+            "the boxed error echoed the default: {rendered}"
+        );
+    }
+
+    /// `could not read config "<path>"` reproduces the path, which for a
+    /// consumer honouring a `*_FLAGS_CONFIG` override is environment-supplied.
+    #[test]
+    fn an_unreadable_config_path_is_never_echoed_by_the_rendered_error() {
+        const PATH: &str = "/nonexistent/ORES_ADMIN_API_FLAGS_CONFIG-attacker-controlled.toml";
+        let report = BundledFlags2Env::new()
+            .audit_report(Some(PATH))
+            .expect("the auditor reports unreadable configs rather than failing");
+        assert!(!report.passed(), "a missing config must not pass");
+        assert!(
+            report.error_summary().contains(PATH),
+            "premise changed, the auditor no longer quotes the path: {}",
+            report.error_summary()
+        );
+        let rendered = AuditFailed { report }.to_string();
+        assert!(
+            !rendered.contains(PATH),
+            "the rendered error echoed the config path: {rendered}"
+        );
+        assert!(
+            rendered.contains("<redacted-path>"),
+            "redaction marker missing: {rendered}"
+        );
+    }
+
+    /// Redaction must not eat the structural names that make the rejection
+    /// actionable -- that was the whole point of reading the report.
+    #[test]
+    fn redaction_keeps_the_key_and_table_names() {
+        let report = assert_report_matches_status(&format!(
+            "[env]\nload = false\nignore_prefixes = [\"AUTH_SUPABASE_\"]\n{MINIMAL}"
+        ));
+        assert_eq!(
+            report.redacted_error_summary(),
+            "unknown key \"ignore_prefixes\" in [env]"
+        );
+        let report = assert_report_matches_status(&format!(
+            "[identity]\nname = \"svc\"\n{MINIMAL}"
+        ));
+        assert_eq!(
+            report.redacted_error_summary(),
+            "unknown config table [identity]"
+        );
+    }
+
+    /// A NULL or unparseable report must fail closed, never read as a pass.
+    #[test]
+    fn a_missing_or_garbage_report_never_reads_as_a_pass() {
+        // Shapes the FFI boundary can hand back. `ok` absent, `ok` of the
+        // wrong type, and an empty object all have to come out as "not
+        // passed".
+        for raw in ["{}", "{\"ok\":\"yes\"}", "{\"errors\":[]}", "{\"ok\":false}"] {
+            let value: serde_json::Value = serde_json::from_str(raw).expect("test fixture");
+            let report = AuditReport {
+                ok: value
+                    .get("ok")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                errors: json_string_vec(value.get("errors")),
+                warnings: json_string_vec(value.get("warnings")),
+            };
+            assert!(!report.passed(), "{raw} was read as a pass");
+        }
+        // Non-JSON text is rejected before it can become a report at all.
+        assert!(serde_json::from_str::<serde_json::Value>("not json").is_err());
     }
 }

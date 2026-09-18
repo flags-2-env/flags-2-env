@@ -159,9 +159,28 @@ pub struct ResolvedCommands {
 
 /// A parsed `.cli-flags.toml` contract audit report.
 ///
-/// Findings name config tables, keys and flag names only — never a value read
-/// from argv, the environment, or a `.env` file — so a service that refuses to
-/// start may log the whole report without leaking a secret.
+/// # What a finding may contain
+///
+/// No finding is ever derived from argv, the process environment, or a `.env`
+/// file — the auditor never sees those. Most findings name only structural
+/// identifiers from the contract (`unknown config table [identity]`,
+/// `unknown key "ignore_prefixes" in [env]`, `flags.port has no long aliases`),
+/// and those are exactly what makes a rejection actionable.
+///
+/// Two families are different, and were verified against the native auditor:
+///
+/// * `flags.<name> default "<value>" is not a valid <type>` reproduces the
+///   `default` VALUE from the contract verbatim, for the int, double, json,
+///   json array, json object and bool checks (parser.c:3529-3595);
+/// * `could not read config "<path>"` reproduces the CONFIG PATH, which for a
+///   consumer that honours a `*_FLAGS_CONFIG` override is an
+///   environment-supplied string (parser.c:~4166).
+///
+/// So [`Self::error_summary`] is the raw text and is NOT automatically safe to
+/// log. [`Self::redacted_error_summary`] replaces just those two operands and
+/// is what [`AuditFailed`] renders, so the common
+/// `map_err(|error| format!("...: {error}"))` path fails safe while still
+/// naming the offending construct.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AuditReport {
     /// True only when the auditor reported zero error-level findings.
@@ -178,7 +197,12 @@ impl AuditReport {
         self.ok && self.errors.is_empty()
     }
 
-    /// Every error-level finding on one line, for an operator log.
+    /// Every error-level finding on one line, verbatim.
+    ///
+    /// This is the auditor's raw text. Two finding families quote a contract
+    /// `default` value or the config path (see the type documentation), so
+    /// prefer [`Self::redacted_error_summary`] anywhere the result is logged
+    /// or returned to a caller.
     pub fn error_summary(&self) -> String {
         if self.errors.is_empty() {
             "the auditor reported no reason".to_owned()
@@ -186,14 +210,59 @@ impl AuditReport {
             self.errors.join("; ")
         }
     }
+
+    /// Every error-level finding on one line, with the two value-bearing
+    /// operands replaced.
+    ///
+    /// Structural names — tables, keys, flag names, aliases — are kept, because
+    /// they are the diagnostic. Only the quoted operand of a
+    /// `default "<value>"` finding and of `could not read config "<path>"` is
+    /// replaced.
+    pub fn redacted_error_summary(&self) -> String {
+        if self.errors.is_empty() {
+            return "the auditor reported no reason".to_owned();
+        }
+        self.errors
+            .iter()
+            .map(|finding| redact_finding(finding))
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+}
+
+/// Replaces the quoted operand of the two finding families that reproduce a
+/// contract value or the config path. Every other finding is returned as-is.
+fn redact_finding(finding: &str) -> String {
+    for (marker, placeholder) in [
+        ("could not read config \"", "<redacted-path>"),
+        (" default \"", "<redacted-value>"),
+    ] {
+        if let Some(start) = finding.find(marker) {
+            let operand_start = start + marker.len();
+            // The auditor closes the operand with the next double quote.
+            if let Some(length) = finding[operand_start..].find('"') {
+                let mut out = String::with_capacity(finding.len());
+                out.push_str(&finding[..operand_start]);
+                out.push_str(placeholder);
+                out.push_str(&finding[operand_start + length..]);
+                return out;
+            }
+        }
+    }
+    finding.to_owned()
 }
 
 /// The error [`BundledFlags2Env::audit_config`] returns when the contract is
 /// rejected.
 ///
-/// It carries the full [`AuditReport`], so a caller can print
-/// [`AuditReport::error_summary`] or inspect the findings individually instead
-/// of collapsing the failure to an opaque status code.
+/// It carries the full [`AuditReport`], so a caller can inspect the findings
+/// individually instead of collapsing the failure to an opaque status code.
+///
+/// Its `Display` renders [`AuditReport::redacted_error_summary`], not the raw
+/// text, so a consumer that does the obvious
+/// `map_err(|error| format!("contract rejected: {error}"))` cannot echo a
+/// contract `default` value or an environment-supplied config path. A caller
+/// that genuinely wants the raw operands reads `report.error_summary()`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AuditFailed {
     pub report: AuditReport,
@@ -204,7 +273,7 @@ impl fmt::Display for AuditFailed {
         write!(
             formatter,
             "flags2env contract audit failed: {}",
-            self.report.error_summary()
+            self.report.redacted_error_summary()
         )
     }
 }

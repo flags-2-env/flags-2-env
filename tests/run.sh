@@ -641,6 +641,34 @@ if [ "$status" -eq 0 ] || [ "$actual" != "$expected" ]; then
   exit 1
 fi
 
+# [identity] is code-generation metadata, consumed by `f2e generate` to name
+# the emitted env type and the SERVICE constant. The runtime parser owns argv
+# and the environment, not the names a generator gives its output, so the table
+# must audit clean rather than fail closed as an unknown table.
+IDENTITY_CONFIG="$ROOT_DIR/tests/audit-identity-codegen-metadata/.cli-flags.toml"
+set +e
+actual="$("$CLI" audit "$IDENTITY_CONFIG")"
+status=$?
+set -e
+expected='{"ok":true,"errorCount":0,"warningCount":0,"errors":[],"warnings":[]}'
+if [ "$status" -ne 0 ] || [ "$actual" != "$expected" ]; then
+  printf 'Recognized [identity] codegen metadata must audit clean.\nExpected: %s\nActual: %s\n' "$expected" "$actual" >&2
+  exit 1
+fi
+
+# Recognizing the table is not the same as ignoring its contents: a misspelled
+# key must still fail closed, or it would land in a generated type name.
+IDENTITY_TYPO_CONFIG="$ROOT_DIR/tests/audit-invalid-identity-key/.cli-flags.toml"
+set +e
+actual="$("$CLI" audit "$IDENTITY_TYPO_CONFIG")"
+status=$?
+set -e
+expected='{"ok":false,"errorCount":1,"warningCount":0,"errors":["unknown key \"servcie\" in [identity]"],"warnings":[]}'
+if [ "$status" -eq 0 ] || [ "$actual" != "$expected" ]; then
+  printf 'Unknown key inside [identity] must fail closed.\nExpected: %s\nActual: %s\n' "$expected" "$actual" >&2
+  exit 1
+fi
+
 INVALID_TYPE_CONFIG="$ROOT_DIR/tests/audit-invalid-type/.cli-flags.toml"
 set +e
 actual="$("$CLI" audit "$INVALID_TYPE_CONFIG")"

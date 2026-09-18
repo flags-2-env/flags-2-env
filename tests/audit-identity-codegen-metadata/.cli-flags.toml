@@ -1,0 +1,12 @@
+# [identity] is authored input for the `f2e` code generator: it names the
+# emitted env type and the SERVICE constant. The runtime parser does not read
+# it, but it must not reject it either -- 192 fleet repositories carry it.
+[identity]
+service = "3fa-sidecar"
+type_name = "SidecarEnv"
+
+[flags.bind]
+env = "THREEFA_SIDECAR_BIND"
+aliases = ["bind"]
+type = "string"
+default = "127.0.0.1:9090"

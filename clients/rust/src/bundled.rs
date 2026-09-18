@@ -53,7 +53,10 @@ unsafe extern "C" {
     ) -> *mut c_char;
     fn f2e_audit_config() -> *mut c_char;
     fn f2e_audit_config_from_file(config_path: *const c_char) -> *mut c_char;
-    fn f2e_audit_config_status() -> i32;
+    // Retained for the parity test that pins the report-based path to the
+    // status code it replaced. Production code reads the report instead: the
+    // status code cannot say why a config was rejected.
+    #[cfg(test)]
     fn f2e_audit_config_status_from_file(config_path: *const c_char) -> i32;
     fn f2e_doctor_from_file(config_path: *const c_char) -> *mut c_char;
     fn f2e_doctor_status_from_file(config_path: *const c_char) -> i32;

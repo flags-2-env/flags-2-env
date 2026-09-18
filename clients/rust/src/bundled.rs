@@ -6,7 +6,8 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::{
-    coercion_input_json, decode_coercion_report, CoercionError, ResolvedCommands, StructuredParse,
+    coercion_input_json, decode_coercion_report, AuditFailed, AuditReport, CoercionError,
+    ResolvedCommands, StructuredParse,
 };
 
 unsafe extern "C" {
@@ -50,7 +51,12 @@ unsafe extern "C" {
         shell: *const c_char,
         command_name: *const c_char,
     ) -> *mut c_char;
-    fn f2e_audit_config_status() -> i32;
+    fn f2e_audit_config() -> *mut c_char;
+    fn f2e_audit_config_from_file(config_path: *const c_char) -> *mut c_char;
+    // Retained for the parity test that pins the report-based path to the
+    // status code it replaced. Production code reads the report instead: the
+    // status code cannot say why a config was rejected.
+    #[cfg(test)]
     fn f2e_audit_config_status_from_file(config_path: *const c_char) -> i32;
     fn f2e_doctor_from_file(config_path: *const c_char) -> *mut c_char;
     fn f2e_doctor_status_from_file(config_path: *const c_char) -> i32;
@@ -270,22 +276,59 @@ impl BundledFlags2Env {
         })
     }
 
+    /// Audits `.cli-flags.toml` and returns the findings whether or not it
+    /// passed.
+    ///
+    /// Prefer this over [`Self::audit_config`] when the caller wants to render
+    /// findings its own way. The native auditor already produces a reason for
+    /// every rejection; this reads that report instead of the bare status code,
+    /// so a rejected contract can say *which* table or key it tripped on.
+    pub fn audit_report(
+        &self,
+        config_path: Option<&str>,
+    ) -> Result<AuditReport, Box<dyn std::error::Error>> {
+        let raw = if let Some(config_path) = config_path {
+            let config_path = CString::new(config_path)?;
+            // SAFETY: the CString is valid for the duration of the call; the
+            // returned pointer is owned here and released by
+            // `take_owned_string`.
+            take_owned_string(unsafe { f2e_audit_config_from_file(config_path.as_ptr()) })
+        } else {
+            // SAFETY: the C API takes no arguments and returns an owned string.
+            take_owned_string(unsafe { f2e_audit_config() })
+        }
+        // A NULL report means the auditor could not even allocate one. Fail
+        // closed: never read "no report" as "nothing wrong".
+        .ok_or("flags2env returned no config audit report")?;
+
+        let report: serde_json::Value = serde_json::from_str(&raw)?;
+        Ok(AuditReport {
+            ok: report
+                .get("ok")
+                .and_then(serde_json::Value::as_bool)
+                .unwrap_or(false),
+            errors: json_string_vec(report.get("errors")),
+            warnings: json_string_vec(report.get("warnings")),
+        })
+    }
+
+    /// `Ok(())` when `.cli-flags.toml` satisfies the contract.
+    ///
+    /// On rejection the error is an [`AuditFailed`] carrying the full
+    /// [`AuditReport`], so `to_string()` names the offending construct — for
+    /// example `unknown config table [identity]` or
+    /// `unknown key "ignore_prefixes" in [env]`. Callers that previously
+    /// discarded this error (`map_err(|_| "audit failed")`) should propagate
+    /// it: the reason is the difference between a one-line fix and a bisect.
     pub fn audit_config(
         &self,
         config_path: Option<&str>,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        let status = if let Some(config_path) = config_path {
-            let config_path = CString::new(config_path)?;
-            // SAFETY: the CString is valid for the duration of the call.
-            unsafe { f2e_audit_config_status_from_file(config_path.as_ptr()) }
-        } else {
-            // SAFETY: the C API takes no arguments.
-            unsafe { f2e_audit_config_status() }
-        };
-        if status == 0 {
+        let report = self.audit_report(config_path)?;
+        if report.passed() {
             Ok(())
         } else {
-            Err(format!("flags2env config audit failed with status {status}").into())
+            Err(Box::new(AuditFailed { report }))
         }
     }
 
@@ -709,5 +752,235 @@ help = "Server bind address."
         BundledFlags2Env::new()
             .audit_config(path.to_str())
             .expect("valid config");
+    }
+}
+
+#[cfg(test)]
+mod audit_diagnostics_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn audit(contract: &str) -> (AuditReport, i32) {
+        let mut file = tempfile::NamedTempFile::new().expect("temp contract");
+        file.write_all(contract.as_bytes()).expect("write contract");
+        let path = file.path().to_str().expect("utf-8 path");
+        let report = BundledFlags2Env::new()
+            .audit_report(Some(path))
+            .expect("audit report");
+        let c_path = CString::new(path).expect("nul-free path");
+        // SAFETY: the CString outlives the call.
+        let status = unsafe { f2e_audit_config_status_from_file(c_path.as_ptr()) };
+        (report, status)
+    }
+
+    /// The report-based path must agree with the bare status code it replaced,
+    /// in both directions, or this crate would start or refuse the wrong
+    /// configs.
+    fn assert_report_matches_status(contract: &str) -> AuditReport {
+        let (report, status) = audit(contract);
+        assert_eq!(
+            report.passed(),
+            status == 0,
+            "report.passed()={} disagrees with f2e_audit_config_status_from_file()={status}",
+            report.passed()
+        );
+        report
+    }
+
+    const MINIMAL: &str = r#"
+[flags.bind]
+env = "APP_BIND"
+aliases = ["bind"]
+type = "string"
+"#;
+
+    #[test]
+    fn a_conformant_contract_passes_and_agrees_with_the_status_code() {
+        let report = assert_report_matches_status(MINIMAL);
+        assert!(report.passed());
+        assert!(report.errors.is_empty());
+    }
+
+    /// Regression: `shared-auth/shared-auth-api-server.rs` ships this `[env]`
+    /// key. Before this change the rejection surfaced only as
+    /// "audit failed with status 1", which read like an unrelated bug in each
+    /// of the repos that carried it.
+    #[test]
+    fn an_unknown_env_key_names_itself() {
+        let report = assert_report_matches_status(&format!(
+            "[env]\nload = false\nignore_prefixes = [\"AUTH_SUPABASE_\"]\n{MINIMAL}"
+        ));
+        assert!(!report.passed());
+        assert_eq!(
+            report.errors,
+            vec!["unknown key \"ignore_prefixes\" in [env]".to_owned()]
+        );
+    }
+
+    /// Regression: `shared-auth/shared-auth-admin-api-server.rs` and
+    /// `memebank/memebank-api-server.rs` ship an `[identity]` table, which the
+    /// authored schema (`contracts/cli-flags-config/authored.schema.json`)
+    /// has never declared.
+    #[test]
+    fn an_unknown_table_names_itself() {
+        let report = assert_report_matches_status(&format!(
+            "[identity]\nname = \"svc\"\n{MINIMAL}"
+        ));
+        assert!(!report.passed());
+        assert_eq!(
+            report.errors,
+            vec!["unknown config table [identity]".to_owned()]
+        );
+    }
+
+    /// The whole point of the change: the error a caller propagates carries the
+    /// reason, not a status code.
+    #[test]
+    fn audit_config_error_carries_the_reason() {
+        let mut file = tempfile::NamedTempFile::new().expect("temp contract");
+        file.write_all(format!("[identity]\nname = \"svc\"\n{MINIMAL}").as_bytes())
+            .expect("write contract");
+        let error = BundledFlags2Env::new()
+            .audit_config(Some(file.path().to_str().expect("utf-8 path")))
+            .expect_err("rejected contract");
+
+        let rendered = error.to_string();
+        assert!(
+            rendered.contains("unknown config table [identity]"),
+            "error did not name the offending table: {rendered}"
+        );
+        assert!(
+            !rendered.contains("status 1"),
+            "error still reports a bare status code: {rendered}"
+        );
+
+        let failure = error
+            .downcast_ref::<AuditFailed>()
+            .expect("AuditFailed is recoverable from the boxed error");
+        assert_eq!(
+            failure.report.errors,
+            vec!["unknown config table [identity]".to_owned()]
+        );
+    }
+
+    /// An unknown table is reported by NAME, so nothing under it is echoed.
+    /// This is the shape most findings have.
+    #[test]
+    fn an_unknown_table_is_reported_without_its_contents() {
+        let report = assert_report_matches_status(&format!(
+            "[identity]\nname = \"do-not-echo-this-value\"\n{MINIMAL}"
+        ));
+        assert!(!report.passed());
+        assert!(
+            !report.error_summary().contains("do-not-echo-this-value"),
+            "audit reflected a config value: {}",
+            report.error_summary()
+        );
+    }
+
+    /// The finding families that DO reproduce an operand, and the redaction
+    /// that keeps them out of a log.
+    ///
+    /// The previous version of this test asserted "findings never reflect
+    /// values" using an unknown TABLE, which structurally cannot contain a
+    /// value — it passed for the wrong reason. These cases were verified
+    /// against the native auditor: it really does quote the `default` value
+    /// and the config path.
+    #[test]
+    fn a_default_value_is_echoed_raw_but_never_by_the_error_a_caller_renders() {
+        const SECRET: &str = "postgres://user:SUPER_SECRET@db/app";
+        let report = assert_report_matches_status(&format!(
+            "[flags.port]\nenv = \"APP_PORT\"\naliases = [\"port\"]\ntype = \"int\"\ndefault = \"{SECRET}\"\n"
+        ));
+        assert!(!report.passed());
+        // The auditor's raw text really does carry it.
+        assert!(
+            report.error_summary().contains(SECRET),
+            "premise changed, the auditor no longer quotes the default: {}",
+            report.error_summary()
+        );
+        // The redacted form does not, and still names the construct.
+        let redacted = report.redacted_error_summary();
+        assert!(
+            !redacted.contains(SECRET),
+            "the redacted summary echoed the default: {redacted}"
+        );
+        assert!(
+            redacted.contains("flags.port default \"<redacted-value>\" is not a valid integer"),
+            "redaction lost the diagnostic: {redacted}"
+        );
+        // And that is what a caller doing `format!("{error}")` gets.
+        let rendered = AuditFailed { report }.to_string();
+        assert!(
+            !rendered.contains(SECRET),
+            "the boxed error echoed the default: {rendered}"
+        );
+    }
+
+    /// `could not read config "<path>"` reproduces the path, which for a
+    /// consumer honouring a `*_FLAGS_CONFIG` override is environment-supplied.
+    #[test]
+    fn an_unreadable_config_path_is_never_echoed_by_the_rendered_error() {
+        const PATH: &str = "/nonexistent/ORES_ADMIN_API_FLAGS_CONFIG-attacker-controlled.toml";
+        let report = BundledFlags2Env::new()
+            .audit_report(Some(PATH))
+            .expect("the auditor reports unreadable configs rather than failing");
+        assert!(!report.passed(), "a missing config must not pass");
+        assert!(
+            report.error_summary().contains(PATH),
+            "premise changed, the auditor no longer quotes the path: {}",
+            report.error_summary()
+        );
+        let rendered = AuditFailed { report }.to_string();
+        assert!(
+            !rendered.contains(PATH),
+            "the rendered error echoed the config path: {rendered}"
+        );
+        assert!(
+            rendered.contains("<redacted-path>"),
+            "redaction marker missing: {rendered}"
+        );
+    }
+
+    /// Redaction must not eat the structural names that make the rejection
+    /// actionable -- that was the whole point of reading the report.
+    #[test]
+    fn redaction_keeps_the_key_and_table_names() {
+        let report = assert_report_matches_status(&format!(
+            "[env]\nload = false\nignore_prefixes = [\"AUTH_SUPABASE_\"]\n{MINIMAL}"
+        ));
+        assert_eq!(
+            report.redacted_error_summary(),
+            "unknown key \"ignore_prefixes\" in [env]"
+        );
+        let report = assert_report_matches_status(&format!(
+            "[identity]\nname = \"svc\"\n{MINIMAL}"
+        ));
+        assert_eq!(
+            report.redacted_error_summary(),
+            "unknown config table [identity]"
+        );
+    }
+
+    /// A NULL or unparseable report must fail closed, never read as a pass.
+    #[test]
+    fn a_missing_or_garbage_report_never_reads_as_a_pass() {
+        // Shapes the FFI boundary can hand back. `ok` absent, `ok` of the
+        // wrong type, and an empty object all have to come out as "not
+        // passed".
+        for raw in ["{}", "{\"ok\":\"yes\"}", "{\"errors\":[]}", "{\"ok\":false}"] {
+            let value: serde_json::Value = serde_json::from_str(raw).expect("test fixture");
+            let report = AuditReport {
+                ok: value
+                    .get("ok")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(false),
+                errors: json_string_vec(value.get("errors")),
+                warnings: json_string_vec(value.get("warnings")),
+            };
+            assert!(!report.passed(), "{raw} was read as a pass");
+        }
+        // Non-JSON text is rejected before it can become a report at all.
+        assert!(serde_json::from_str::<serde_json::Value>("not json").is_err());
     }
 }

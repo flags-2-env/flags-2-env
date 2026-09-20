@@ -4,9 +4,11 @@
 //! It does not maintain a second TOML parser, type mapping, or default table.
 //! Use it as a build dependency; keep `flags2env` at the runtime argv boundary.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fs;
+use std::io::{Error as IoError, ErrorKind};
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 
@@ -40,6 +42,91 @@ pub struct GeneratedFiles {
     pub contract: PathBuf,
 }
 
+/// Collapse repeated Rust fields which intentionally share one environment key
+/// across command scopes.
+///
+/// The native parser keeps every scoped flag declaration because argv matching
+/// needs those scopes. A generated configuration type is different: an env key
+/// is one value in the process environment and therefore must appear only once
+/// in a Rust struct. Identical projections are deduplicated in first-declaration
+/// order. If the same env key projects to a different Rust type or different
+/// optional/default shape, generation fails closed instead of silently choosing
+/// one command's declaration.
+fn dedupe_generated_rust_fields(source: &str) -> Result<String, IoError> {
+    let mut output = String::with_capacity(source.len());
+    let mut in_struct = false;
+    let mut pending_attributes = Vec::<String>::new();
+    let mut seen = BTreeMap::<String, String>::new();
+
+    for line in source.split_inclusive('\n') {
+        let trimmed = line.trim();
+        if !in_struct {
+            output.push_str(line);
+            if trimmed.starts_with("pub struct ") && trimmed.ends_with('{') {
+                in_struct = true;
+            }
+            continue;
+        }
+
+        if trimmed == "}" {
+            for attribute in pending_attributes.drain(..) {
+                output.push_str(&attribute);
+            }
+            output.push_str(line);
+            in_struct = false;
+            continue;
+        }
+
+        if trimmed.starts_with("#[") {
+            pending_attributes.push(line.to_owned());
+            continue;
+        }
+
+        if let Some(field) = trimmed.strip_prefix("pub ") {
+            if let Some((name, rust_type)) = field.split_once(':') {
+                let name = name.trim();
+                let rust_type = rust_type.trim().trim_end_matches(',').trim();
+                let attributes = pending_attributes
+                    .iter()
+                    .map(|attribute| attribute.trim())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                let signature = format!("{attributes}\n{rust_type}");
+
+                if let Some(previous) = seen.get(name) {
+                    if previous != &signature {
+                        return Err(IoError::new(
+                            ErrorKind::InvalidData,
+                            format!(
+                                "flags2env generated conflicting Rust fields for shared env key {name}: {previous:?} versus {signature:?}"
+                            ),
+                        ));
+                    }
+                    pending_attributes.clear();
+                    continue;
+                }
+
+                seen.insert(name.to_owned(), signature);
+                for attribute in pending_attributes.drain(..) {
+                    output.push_str(&attribute);
+                }
+                output.push_str(line);
+                continue;
+            }
+        }
+
+        for attribute in pending_attributes.drain(..) {
+            output.push_str(&attribute);
+        }
+        output.push_str(line);
+    }
+
+    for attribute in pending_attributes {
+        output.push_str(&attribute);
+    }
+    Ok(output)
+}
+
 /// Audit a contract and generate one language using the bundled native core.
 ///
 /// Every native allocation is released, including invalid UTF-8 results.
@@ -61,15 +148,16 @@ pub fn generate_types(
     // This call also retains the Rust runtime's bundled native linkage.
     flags2env::BundledFlags2Env::new().audit_config(Some(config))?;
     let config = CString::new(config)?;
-    let language = CString::new(match language {
+    let language_name = match language {
         Language::Rust => "rust",
         Language::JsonSchema => "json-schema",
-    })?;
+    };
+    let language_c = CString::new(language_name)?;
     let type_name = CString::new(type_name)?;
     // SAFETY: live NUL-terminated inputs; the bundled core owns the returned
     // allocation and specifies f2e_free as its corresponding deallocator.
     let raw = unsafe {
-        f2e_generate_types_from_file(config.as_ptr(), language.as_ptr(), type_name.as_ptr())
+        f2e_generate_types_from_file(config.as_ptr(), language_c.as_ptr(), type_name.as_ptr())
     };
     if raw.is_null() {
         return Err("flags2env native type generation returned no result".into());
@@ -78,9 +166,12 @@ pub fn generate_types(
     let output = unsafe { CStr::from_ptr(raw) }.to_str().map(str::to_owned);
     // SAFETY: release exactly once, after copying or recording a UTF-8 error.
     unsafe { f2e_free(raw) };
-    let output = output?;
+    let mut output = output?;
     if output.trim().is_empty() {
         return Err("flags2env generated an empty type definition".into());
+    }
+    if matches!(language, Language::Rust) {
+        output = dedupe_generated_rust_fields(&output)?;
     }
     Ok(output)
 }
@@ -125,4 +216,53 @@ pub fn generate_cargo(
     println!("cargo:rerun-if-changed={}", config.display());
     let output = std::env::var_os("OUT_DIR").ok_or("Cargo did not set OUT_DIR")?;
     generate_into(config, Path::new(&output), type_name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn rust_projection_dedupes_identical_shared_env_fields() {
+        let source = concat!(
+            "// generated\n",
+            "pub struct CliConfig {\n",
+            "    pub ORES_ROOT: String,\n",
+            "    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n",
+            "    pub ORES_CHECK: Option<bool>,\n",
+            "    pub ORES_ROOT: String,\n",
+            "    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n",
+            "    pub ORES_CHECK: Option<bool>,\n",
+            "}\n",
+        );
+        let output = dedupe_generated_rust_fields(source).expect("dedupe");
+        assert_eq!(output.matches("pub ORES_ROOT:").count(), 1);
+        assert_eq!(output.matches("pub ORES_CHECK:").count(), 1);
+        assert_eq!(output.matches("skip_serializing_if").count(), 1);
+    }
+
+    #[test]
+    fn rust_projection_fails_on_shared_env_type_conflict() {
+        let source = concat!(
+            "pub struct CliConfig {\n",
+            "    pub ORES_SHARED: bool,\n",
+            "    pub ORES_SHARED: String,\n",
+            "}\n",
+        );
+        let error = dedupe_generated_rust_fields(source).expect_err("must fail");
+        assert!(error.to_string().contains("ORES_SHARED"));
+        assert!(error.to_string().contains("conflicting Rust fields"));
+    }
+
+    #[test]
+    fn rust_projection_fails_on_shared_env_optional_shape_conflict() {
+        let source = concat!(
+            "pub struct CliConfig {\n",
+            "    pub ORES_SHARED: bool,\n",
+            "    #[serde(default, skip_serializing_if = \"Option::is_none\")]\n",
+            "    pub ORES_SHARED: Option<bool>,\n",
+            "}\n",
+        );
+        assert!(dedupe_generated_rust_fields(source).is_err());
+    }
 }

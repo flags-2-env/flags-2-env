@@ -17,6 +17,18 @@
       "require": "./clients/nodejs/lib.cjs",
       "default": "./clients/nodejs/lib.mjs"
     },
+    "./typed": {
+      "types": "./clients/nodejs/typed.ts",
+      "import": "./clients/nodejs/typed.mjs",
+      "require": "./clients/nodejs/typed.cjs",
+      "default": "./clients/nodejs/typed.mjs"
+    },
+    "./reactive": {
+      "types": "./clients/nodejs/reactive.ts",
+      "import": "./clients/nodejs/reactive.mjs",
+      "require": "./clients/nodejs/reactive.cjs",
+      "default": "./clients/nodejs/reactive.mjs"
+    },
     "./bun": {
       "types": "./clients/bun/lib.ts",
       "bun": "./clients/bun/lib.mjs",
@@ -46,6 +58,12 @@
     "clients/nodejs/lib.cjs",
     "clients/nodejs/lib.mjs",
     "clients/nodejs/lib.ts",
+    "clients/nodejs/typed.cjs",
+    "clients/nodejs/typed.mjs",
+    "clients/nodejs/typed.ts",
+    "clients/nodejs/reactive.cjs",
+    "clients/nodejs/reactive.mjs",
+    "clients/nodejs/reactive.ts",
     "clients/bun/lib.cjs",
     "clients/bun/lib.mjs",
     "clients/bun/lib.ts",

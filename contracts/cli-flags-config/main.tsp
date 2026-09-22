@@ -3,6 +3,16 @@ using TypeSpec.JsonSchema;
 
 namespace Flags2Env.Config;
 
+// Code-generation metadata, not runtime configuration. `f2e generate` reads
+// `service` and `type_name` to name the emitted env type and the SERVICE
+// constant; the runtime parser recognizes the table, checks its keys, and
+// otherwise ignores it.
+@id("IdentityConfig")
+model IdentityConfig {
+  service?: string;
+  type_name?: string;
+}
+
 @id("HelpConfig")
 model HelpConfig {
   url?: string;
@@ -78,6 +88,7 @@ model GlobalConfig {
 
 @id("CliFlagsConfig")
 model CliFlagsConfig {
+  identity?: IdentityConfig;
   help?: HelpConfig;
   env?: EnvConfig;
   parse?: ParseConfig;

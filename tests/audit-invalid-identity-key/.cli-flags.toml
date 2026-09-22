@@ -1,0 +1,9 @@
+# Recognizing [identity] must not make it a free-for-all: a misspelled key
+# would otherwise be silently dropped into a generated type name.
+[identity]
+servcie = "typo"
+
+[flags.bind]
+env = "BIND"
+aliases = ["bind"]
+type = "string"

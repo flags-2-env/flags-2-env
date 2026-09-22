@@ -4,9 +4,11 @@
 //! It does not maintain a second TOML parser, type mapping, or default table.
 //! Use it as a build dependency; keep `flags2env` at the runtime argv boundary.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 use std::ffi::{CStr, CString};
 use std::fs;
+use std::io::{Error as IoError, ErrorKind};
 use std::os::raw::c_char;
 use std::path::{Path, PathBuf};
 
@@ -40,6 +42,88 @@ pub struct GeneratedFiles {
     pub contract: PathBuf,
 }
 
+/// The native contract model intentionally permits the same env key to be
+/// exposed by distinct command scopes. That is how compatibility spellings can
+/// project onto one canonical value. A Rust struct, however, may contain the
+/// field only once.
+///
+/// Keep the native parser/code generator authoritative: this function does not
+/// parse TOML or infer types. It only coalesces byte-compatible generated Rust
+/// fields. If two declarations generate different Rust field contracts (type,
+/// required/optional shape, or serde field attributes), generation fails closed
+/// instead of silently choosing one declaration.
+fn coalesce_compatible_rust_fields(source: &str) -> Result<String, Box<dyn Error>> {
+    let mut output = String::with_capacity(source.len());
+    let mut pending_attributes = Vec::<String>::new();
+    let mut seen = BTreeMap::<String, (String, String)>::new();
+
+    for line in source.split_inclusive('\n') {
+        let bare = line.strip_suffix('\n').unwrap_or(line);
+        if bare.starts_with("    #[serde(") {
+            pending_attributes.push(line.to_owned());
+            continue;
+        }
+
+        if let Some(field) = bare.strip_prefix("    pub ") {
+            let (name, tail) = field.split_once(':').ok_or_else(|| {
+                IoError::new(
+                    ErrorKind::InvalidData,
+                    "flags2env generated a Rust public field without a type separator",
+                )
+            })?;
+            if name.is_empty()
+                || !name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+            {
+                return Err(IoError::new(
+                    ErrorKind::InvalidData,
+                    "flags2env generated an invalid Rust field identifier",
+                )
+                .into());
+            }
+
+            let attributes = pending_attributes.concat();
+            let signature = tail.trim().to_owned();
+            match seen.get(name) {
+                Some((previous_attributes, previous_signature))
+                    if previous_attributes == &attributes && previous_signature == &signature =>
+                {
+                    pending_attributes.clear();
+                    continue;
+                }
+                Some(_) => {
+                    return Err(IoError::new(
+                        ErrorKind::InvalidData,
+                        format!(
+                            "env {name} is declared in multiple command scopes with incompatible generated Rust contracts; shared env declarations must agree on type and optionality"
+                        ),
+                    )
+                    .into());
+                }
+                None => {
+                    seen.insert(name.to_owned(), (attributes.clone(), signature));
+                    for attribute in pending_attributes.drain(..) {
+                        output.push_str(&attribute);
+                    }
+                    output.push_str(line);
+                    continue;
+                }
+            }
+        }
+
+        for attribute in pending_attributes.drain(..) {
+            output.push_str(&attribute);
+        }
+        output.push_str(line);
+    }
+
+    for attribute in pending_attributes {
+        output.push_str(&attribute);
+    }
+    Ok(output)
+}
+
 /// Audit a contract and generate one language using the bundled native core.
 ///
 /// Every native allocation is released, including invalid UTF-8 results.
@@ -60,6 +144,7 @@ pub fn generate_types(
     let config = config.to_str().ok_or("contract path must be UTF-8")?;
     // This call also retains the Rust runtime's bundled native linkage.
     flags2env::BundledFlags2Env::new().audit_config(Some(config))?;
+    let rust_output = matches!(language, Language::Rust);
     let config = CString::new(config)?;
     let language = CString::new(match language {
         Language::Rust => "rust",
@@ -82,7 +167,11 @@ pub fn generate_types(
     if output.trim().is_empty() {
         return Err("flags2env generated an empty type definition".into());
     }
-    Ok(output)
+    if rust_output {
+        coalesce_compatible_rust_fields(&output)
+    } else {
+        Ok(output)
+    }
 }
 
 /// Generate build products into a caller-owned output directory.

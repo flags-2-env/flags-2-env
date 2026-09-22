@@ -28,6 +28,47 @@ Use generated types to make keys and values exact at compile time:
 flags2env generate-types typescript > generated/cli-config.ts
 ```
 
+## Dynamic discovery, static typing
+
+Finding `.cli-flags.toml` may remain dynamic. The fleet-standard locator is `ores-config-discovery`: starting from the working directory, find the nearest matching config without crossing the repository boundary.
+
+Compile-time typing is different: a compiler cannot derive a stable type from whichever config file might be discovered later at runtime. The generated type therefore needs a **hard, static import target**.
+
+Recommended flow:
+
+```text
+build / sync
+  -> ores-config-discovery locates one concrete .cli-flags.toml
+  -> flags2env parses + normalizes that file
+  -> generated/cli-config.ts (or .rs/.dart/.go/...) is emitted
+  -> application source statically imports generated/cli-config
+
+runtime
+  -> flags2env dynamically locates .cli-flags.toml again
+  -> parser resolves argv/env/dotenv/defaults
+  -> runtime config fingerprint is compared with generated fingerprint
+  -> values are coerced using that schema
+```
+
+For TypeScript the consumer should look like:
+
+```ts
+import type { CliConfig } from "./generated/cli-config.js";
+import { parseTyped } from "@oresoftware/f2e/typed";
+
+const config: CliConfig = parseTyped<CliConfig>();
+```
+
+The generated artifact should contain a stable schema/config fingerprint alongside the type declaration. `parseTyped` (or a stricter `parseTypedChecked`) can compare that fingerprint to the runtime-discovered config and fail closed when a nested `.cli-flags.toml` or changed file no longer matches the type compiled into the application.
+
+This is especially important because nearest-wins discovery intentionally permits a nested config to override the repository-root config. Dynamic lookup remains useful, but it must not silently invalidate a statically generated type.
+
+`ores-config-discovery` is currently a Rust crate while the authoritative flags2env parser is C. Do not add C-to-Rust FFI solely for directory walking. Near term:
+
+- use `ores-config-discovery` directly in Rust/build/codegen entrypoints;
+- keep C runtime discovery behavior aligned through shared conformance fixtures;
+- move to one direct implementation when the parser/runtime boundary can consume the Rust locator without adding an otherwise unnecessary FFI layer.
+
 ## Value model
 
 The existing native schema supports:
@@ -123,4 +164,6 @@ The recursive typed-array work should add one normalized schema AST/JSON IR and 
 - finite floating-point validation;
 - boolean alias normalization;
 - exact object/array JSON validation;
+- generated config/schema fingerprinting and runtime verification;
+- discovery conformance against `ores-config-discovery`;
 - fixtures proving the same input either succeeds with the same semantic value or fails in every client.

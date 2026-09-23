@@ -84,6 +84,12 @@ for (const required of [
   "LICENSE",
   "README.md",
   "clients/nodejs/lib.mjs",
+  "clients/nodejs/typed.mjs",
+  "clients/nodejs/typed.cjs",
+  "clients/nodejs/typed.ts",
+  "clients/nodejs/reactive.mjs",
+  "clients/nodejs/reactive.cjs",
+  "clients/nodejs/reactive.ts",
   "clients/bun/lib.mjs",
   "clients/deno/mod.ts",
   "src/parser.c",
@@ -91,6 +97,13 @@ for (const required of [
 ]) {
   if (!files.includes(required)) {
     process.stderr.write(`npm package is missing required file: ${required}\n`);
+    process.exit(1);
+  }
+}
+
+for (const exportName of ["./typed", "./reactive"]) {
+  if (!packageManifest.exports?.[exportName]) {
+    process.stderr.write(`npm package is missing required export: ${exportName}\n`);
     process.exit(1);
   }
 }

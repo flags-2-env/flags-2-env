@@ -19,6 +19,29 @@ type = "integer"
 default = 10
 "#;
 
+const SHARED_ENV_COMMAND_CONTRACT: &str = r#"
+[env]
+files = []
+[parse]
+allow_unknown = false
+
+[commands.sync]
+env = "COMMAND_SYNC"
+[commands.sync.flags.given]
+env = "RPC_GIVEN"
+aliases = ["given"]
+type = "string"
+
+[commands.rpc]
+env = "COMMAND_RPC"
+[commands.rpc.commands.sync]
+env = "COMMAND_RPC_SYNC"
+[commands.rpc.commands.sync.flags.given]
+env = "RPC_GIVEN"
+aliases = ["given"]
+type = "string"
+"#;
+
 #[test]
 fn generates_rust_schema_and_exact_embeddable_contract() {
     let dir = tempfile::tempdir().unwrap();
@@ -64,6 +87,28 @@ fn canonical_negation_and_last_occurrence_use_the_native_parser() {
         assert!(parsed.errors.is_empty(), "{:?}", parsed.errors);
         assert!(parsed.unknown_options.is_empty());
         assert_eq!(parsed.flags.get("JSON_ENABLED").unwrap(), expected);
+    }
+}
+
+#[test]
+fn shared_env_across_compatibility_command_scopes_generates_one_rust_field() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().join(".cli-flags.toml");
+    fs::write(&config, SHARED_ENV_COMMAND_CONTRACT).unwrap();
+    let rust = generate_types(&config, Language::Rust, "CliConfig").unwrap();
+    assert_eq!(rust.matches("pub RPC_GIVEN:").count(), 1, "{rust}");
+    assert!(rust.contains("pub RPC_GIVEN: Option<String>"), "{rust}");
+
+    for argv in [
+        vec!["app", "sync", "--given", "api"],
+        vec!["app", "rpc", "sync", "--given", "api"],
+    ] {
+        let args = argv.into_iter().map(str::to_owned).collect::<Vec<_>>();
+        let parsed = BundledFlags2Env::new()
+            .parse_structured(&args, config.to_str())
+            .unwrap();
+        assert!(parsed.errors.is_empty(), "{:?}", parsed.errors);
+        assert_eq!(parsed.flags.get("RPC_GIVEN").map(String::as_str), Some("api"));
     }
 }
 

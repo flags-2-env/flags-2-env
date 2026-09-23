@@ -89,6 +89,9 @@ jobs:
       - name: Audit npm package contents
         run: node scripts/audit-npm-package.mjs
 
+      - name: Run typed Node SDK smoke test
+        run: npm run test:typed-sdk
+
       - name: Run core and shell integration tests
         run: tests/run.sh
 

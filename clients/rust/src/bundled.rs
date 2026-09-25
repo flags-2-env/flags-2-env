@@ -316,7 +316,7 @@ impl BundledFlags2Env {
     ///
     /// On rejection the error is an [`AuditFailed`] carrying the full
     /// [`AuditReport`], so `to_string()` names the offending construct — for
-    /// example `unknown config table [identity]` or
+    /// example `unknown config table [mystery]` or
     /// `unknown key "ignore_prefixes" in [env]`. Callers that previously
     /// discarded this error (`map_err(|_| "audit failed")`) should propagate
     /// it: the reason is the difference between a one-line fix and a bisect.
@@ -817,19 +817,17 @@ type = "string"
         );
     }
 
-    /// Regression: `shared-auth/shared-auth-admin-api-server.rs` and
-    /// `memebank/memebank-api-server.rs` ship an `[identity]` table, which the
-    /// authored schema (`contracts/cli-flags-config/authored.schema.json`)
-    /// has never declared.
+    /// Regression: an unknown table must remain actionable after `[identity]`
+    /// became supported code-generation metadata. `[mystery]` is deliberately
+    /// absent from the authored TypeSpec and JSON Schema authorities.
+
     #[test]
     fn an_unknown_table_names_itself() {
-        let report = assert_report_matches_status(&format!(
-            "[identity]\nname = \"svc\"\n{MINIMAL}"
-        ));
+        let report = assert_report_matches_status(&format!("[mystery]\nname = \"svc\"\n{MINIMAL}"));
         assert!(!report.passed());
         assert_eq!(
             report.errors,
-            vec!["unknown config table [identity]".to_owned()]
+            vec!["unknown config table [mystery]".to_owned()]
         );
     }
 
@@ -838,7 +836,7 @@ type = "string"
     #[test]
     fn audit_config_error_carries_the_reason() {
         let mut file = tempfile::NamedTempFile::new().expect("temp contract");
-        file.write_all(format!("[identity]\nname = \"svc\"\n{MINIMAL}").as_bytes())
+        file.write_all(format!("[mystery]\nname = \"svc\"\n{MINIMAL}").as_bytes())
             .expect("write contract");
         let error = BundledFlags2Env::new()
             .audit_config(Some(file.path().to_str().expect("utf-8 path")))
@@ -846,7 +844,7 @@ type = "string"
 
         let rendered = error.to_string();
         assert!(
-            rendered.contains("unknown config table [identity]"),
+            rendered.contains("unknown config table [mystery]"),
             "error did not name the offending table: {rendered}"
         );
         assert!(
@@ -859,7 +857,7 @@ type = "string"
             .expect("AuditFailed is recoverable from the boxed error");
         assert_eq!(
             failure.report.errors,
-            vec!["unknown config table [identity]".to_owned()]
+            vec!["unknown config table [mystery]".to_owned()]
         );
     }
 
@@ -868,7 +866,7 @@ type = "string"
     #[test]
     fn an_unknown_table_is_reported_without_its_contents() {
         let report = assert_report_matches_status(&format!(
-            "[identity]\nname = \"do-not-echo-this-value\"\n{MINIMAL}"
+            "[mystery]\nname = \"do-not-echo-this-value\"\n{MINIMAL}"
         ));
         assert!(!report.passed());
         assert!(
@@ -953,12 +951,10 @@ type = "string"
             report.redacted_error_summary(),
             "unknown key \"ignore_prefixes\" in [env]"
         );
-        let report = assert_report_matches_status(&format!(
-            "[identity]\nname = \"svc\"\n{MINIMAL}"
-        ));
+        let report = assert_report_matches_status(&format!("[mystery]\nname = \"svc\"\n{MINIMAL}"));
         assert_eq!(
             report.redacted_error_summary(),
-            "unknown config table [identity]"
+            "unknown config table [mystery]"
         );
     }
 
@@ -968,7 +964,12 @@ type = "string"
         // Shapes the FFI boundary can hand back. `ok` absent, `ok` of the
         // wrong type, and an empty object all have to come out as "not
         // passed".
-        for raw in ["{}", "{\"ok\":\"yes\"}", "{\"errors\":[]}", "{\"ok\":false}"] {
+        for raw in [
+            "{}",
+            "{\"ok\":\"yes\"}",
+            "{\"errors\":[]}",
+            "{\"ok\":false}",
+        ] {
             let value: serde_json::Value = serde_json::from_str(raw).expect("test fixture");
             let report = AuditReport {
                 ok: value

@@ -290,7 +290,7 @@ def validate_metadata() -> list[str]:
         errors,
     )
     if zed_package != {
-        "version": "0.3.0",
+        "version": "0.3.1",
         "canonicalIdentity": "flags-2-env/flags-2-env",
         "compatibilityIdentity": "oresoftware/flags-2-env",
         "aliasSupport": "unavailable",
@@ -307,8 +307,8 @@ def validate_metadata() -> list[str]:
     repository = package.get("repository", {}) if isinstance(package, dict) else {}
     if package.get("org") != "flags-2-env" or package.get("name") != "flags-2-env":
         errors.append(".zpkg.toml must declare canonical flags-2-env/flags-2-env")
-    if package.get("version") != "0.3.0":
-        errors.append(".zpkg.toml must release the hardened tip as 0.3.0")
+    if package.get("version") != "0.3.1":
+        errors.append(".zpkg.toml must release the hardened tip as 0.3.1")
     if repository.get("url") != CANONICAL_WEB:
         errors.append(".zpkg.toml repository URL must use the canonical source")
 

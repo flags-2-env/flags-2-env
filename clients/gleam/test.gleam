@@ -1,4 +1,5 @@
 import gleam/dict
+import gleam/string
 import flags2env
 
 pub fn main() {
@@ -30,6 +31,37 @@ pub fn main() {
   case dict_get(combined, "PORT"), dict_get(combined, "KEEP") {
     "8181", "1" -> Nil
     _, _ -> panic as "unexpected combined map"
+  }
+
+
+  case flags2env.audit_config_status_with_config(".cli-flags.toml") {
+    0 -> Nil
+    _ -> panic as "flags contract audit should pass"
+  }
+
+  let structured =
+    flags2env.parse_structured_json_with_config(
+      ["app", "--debug=t", "--port", "8181"],
+      ".cli-flags.toml",
+    )
+  case
+    string.contains(structured, "\"providedFlags\""),
+    string.contains(structured, "\"PORT\":\"8181\""),
+    string.contains(structured, "\"unknownOptions\":[]"),
+    string.contains(structured, "\"errors\":[]")
+  {
+    True, True, True, True -> Nil
+    _, _, _, _ -> panic as "unexpected structured parse report"
+  }
+
+  let rejected =
+    flags2env.parse_structured_json_with_config(
+      ["app", "--definitely-unknown"],
+      ".cli-flags.toml",
+    )
+  case string.contains(rejected, "\"--definitely-unknown\"") {
+    True -> Nil
+    False -> panic as "unknown option should be preserved in structured report"
   }
 }
 

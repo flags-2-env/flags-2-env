@@ -23,6 +23,14 @@ main() ->
 
   Combined = maps:merge(#{<<"PORT">> => <<"env">>, <<"KEEP">> => <<"1">>}, flags2env:parse(["app", "--port", "8181"], Config)),
   assert_map("combined", Combined, [{<<"PORT">>, <<"8181">>}, {<<"KEEP">>, <<"1">>}]),
+
+  0 = flags2env:audit_config_status(Config),
+  Structured = flags2env:parse_structured_json(["app", "--port", "8181"], Config),
+  true = binary:match(Structured, <<"\"providedFlags\"">>) =/= nomatch,
+  true = binary:match(Structured, <<"\"PORT\":\"8181\"">>) =/= nomatch,
+  Rejected = flags2env:parse_structured_json(["app", "--definitely-unknown"], Config),
+  true = binary:match(Rejected, <<"--definitely-unknown">>) =/= nomatch,
+
   ok = file:delete(Config),
   halt(0).
 

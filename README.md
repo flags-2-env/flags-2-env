@@ -752,7 +752,7 @@ and audit commands; use `--release` on a machine with Homebrew configured. The
 C, Bash, and Zsh client `publish.sh` wrappers also surface that Homebrew release
 path.
 
-BEAM clients share the Erlang NIF in `clients/erlang/c_src/flags2env_nif.c`; compile it with Erlang headers plus `clients/erlang/c_src/parser.c` into `priv/flags2env_nif.so`. On macOS, add `-undefined dynamic_lookup` when linking the NIF. Gleam uses `clients/gleam/flags2env_native.erl` as a native shim so its public module can still be named `flags2env` without colliding with the NIF module. Java uses `clients/java/native/flags2env_jni.c`; Kotlin, Scala, Groovy, and Clojure build facade packages over that Java bridge.
+BEAM clients share the Erlang NIF in `clients/erlang/c_src/flags2env_nif.c`; compile it with Erlang headers plus `clients/erlang/c_src/parser.c` into `priv/flags2env_nif.so`. On macOS, add `-undefined dynamic_lookup` when linking the NIF. Gleam uses `clients/gleam/src/flags2env_native.erl` as a native shim so its public module can still be named `flags2env` without colliding with the NIF module. Java uses `clients/java/native/flags2env_jni.c`; Kotlin, Scala, Groovy, and Clojure build facade packages over that Java bridge.
 
 Node, Bun, and Deno use syntax-highlighted source files instead of `.ejs` templates:
 

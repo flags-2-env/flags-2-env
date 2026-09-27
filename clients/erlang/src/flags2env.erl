@@ -7,6 +7,12 @@
   parse_process/1,
   parse/1,
   parse/2,
+  parse_structured_json/1,
+  parse_structured_json/2,
+  audit_config_json/0,
+  audit_config_json/1,
+  audit_config_status/0,
+  audit_config_status/1,
   apply_process/0,
   apply_process/1,
   apply/1,
@@ -32,6 +38,24 @@ parse(_Argv) ->
   erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 parse(_Argv, _ConfigPath) ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+parse_structured_json(_Argv) ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+parse_structured_json(_Argv, _ConfigPath) ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+audit_config_json() ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+audit_config_json(_ConfigPath) ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+audit_config_status() ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+audit_config_status(_ConfigPath) ->
   erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 apply_process() ->

@@ -22,7 +22,7 @@ The Bash and Zsh clients are sourceable shell helpers. They call the native
 `flags2env shell-env` command and evaluate shell-quoted exports so a function or
 script can map its arguments into environment variables in the current shell.
 
-BEAM clients use `clients/erlang/c_src/flags2env_nif.c` as the shared native implementation. Erlang and Elixir load it through the `flags2env` module; Gleam loads the same C implementation through `clients/gleam/flags2env_native.erl` so the public Gleam module can still be named `flags2env`. Java uses `clients/java/native/flags2env_jni.c` as a JNI bridge. Kotlin, Scala, Groovy, and Clojure reuse that Java bridge with small facade packages.
+BEAM clients use `clients/erlang/c_src/flags2env_nif.c` as the shared native implementation. Erlang and Elixir load it through the `flags2env` module; Gleam loads the same C implementation through `clients/gleam/src/flags2env_native.erl` so the public Gleam module can still be named `flags2env`. Java uses `clients/java/native/flags2env_jni.c` as a JNI bridge. Kotlin, Scala, Groovy, and Clojure reuse that Java bridge with small facade packages.
 
 Additional native-runtime clients are scaffolded under:
 

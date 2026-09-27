@@ -63,6 +63,24 @@ pub fn main() {
     True -> Nil
     False -> panic as "unknown option should be preserved in structured report"
   }
+
+
+  case flags2env.help_requested(["app", "--help"]) {
+    True -> Nil
+    False -> panic as "exact --help token should be detected"
+  }
+
+  let help =
+    flags2env.help_table_for_argv(
+      ["app", "--help"],
+      "app",
+      100,
+      ".cli-flags.toml",
+    )
+  case string.contains(help, "--port") {
+    True -> Nil
+    False -> panic as "contract-generated help should include declared port flag"
+  }
 }
 
 fn dict_get(map: dict.Dict(String, String), key: String) -> String {

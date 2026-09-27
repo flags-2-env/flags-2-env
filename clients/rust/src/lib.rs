@@ -189,11 +189,19 @@ impl StructuredParse {
         let mut parts = Vec::new();
         let unknown = self.sanitized_unknown_option_names();
         if !unknown.is_empty() {
-            let noun = if unknown.len() == 1 { "option" } else { "options" };
+            let noun = if unknown.len() == 1 {
+                "option"
+            } else {
+                "options"
+            };
             parts.push(format!("unknown {noun}: {}", unknown.join(", ")));
         }
         if !self.errors.is_empty() {
-            let noun = if self.errors.len() == 1 { "parse error" } else { "parse errors" };
+            let noun = if self.errors.len() == 1 {
+                "parse error"
+            } else {
+                "parse errors"
+            };
             parts.push(format!("{} {noun}", self.errors.len()));
         }
         if !self.extras.is_empty() {

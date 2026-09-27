@@ -31,7 +31,11 @@ fn unknown_option_names_strip_inline_values() {
 
 #[test]
 fn unsafe_unknown_option_text_is_not_returned() {
-    let parsed = parse_with(&["--token=secret", "not an option", "--bad/value"], &[], &[]);
+    let parsed = parse_with(
+        &["--token=secret", "not an option", "--bad/value"],
+        &[],
+        &[],
+    );
     assert_eq!(
         parsed.sanitized_unknown_option_names(),
         vec!["--token".to_owned()]

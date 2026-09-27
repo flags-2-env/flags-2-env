@@ -48,3 +48,15 @@ pub fn audit_config_status() -> Int
 
 @external(erlang, "flags2env_native", "audit_config_status")
 pub fn audit_config_status_with_config(config_path: String) -> Int
+
+
+@external(erlang, "flags2env_native", "help_requested")
+pub fn help_requested(argv: List(String)) -> Bool
+
+@external(erlang, "flags2env_native", "help_table_for_argv")
+pub fn help_table_for_argv(
+  argv: List(String),
+  command_name: String,
+  terminal_columns: Int,
+  config_path: String,
+) -> String

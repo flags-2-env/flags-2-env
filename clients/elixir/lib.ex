@@ -17,6 +17,30 @@ defmodule Flags2Env do
     :flags2env.parse(argv, config_path)
   end
 
+  def parse_structured_json(argv) do
+    :flags2env.parse_structured_json(argv)
+  end
+
+  def parse_structured_json(argv, config_path) do
+    :flags2env.parse_structured_json(argv, config_path)
+  end
+
+  def audit_config_json do
+    :flags2env.audit_config_json()
+  end
+
+  def audit_config_json(config_path) do
+    :flags2env.audit_config_json(config_path)
+  end
+
+  def audit_config_status do
+    :flags2env.audit_config_status()
+  end
+
+  def audit_config_status(config_path) do
+    :flags2env.audit_config_status(config_path)
+  end
+
   def apply_process(env \\ System.get_env()) do
     Map.merge(env, parse_process())
   end

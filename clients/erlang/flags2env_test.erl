@@ -30,6 +30,9 @@ main() ->
   true = binary:match(Structured, <<"\"PORT\":\"8181\"">>) =/= nomatch,
   Rejected = flags2env:parse_structured_json(["app", "--definitely-unknown"], Config),
   true = binary:match(Rejected, <<"--definitely-unknown">>) =/= nomatch,
+  true = flags2env:help_requested(["app", "--help"]),
+  Help = flags2env:help_table_for_argv(["app", "--help"], "app", 100, Config),
+  true = binary:match(Help, <<"--port">>) =/= nomatch,
 
   ok = file:delete(Config),
   halt(0).

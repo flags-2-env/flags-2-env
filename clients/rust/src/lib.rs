@@ -150,6 +150,94 @@ pub struct StructuredParse {
     pub errors: Vec<String>,
 }
 
+impl StructuredParse {
+    /// Return unknown option names with any inline `=value` payload removed.
+    ///
+    /// Only conservative option spellings (`-x`, `--long-name`, underscores)
+    /// are returned. This is the preferred production-facing diagnostic API:
+    /// callers can identify the rejected flag without reflecting a value that
+    /// may contain a credential or other sensitive argv material.
+    #[must_use]
+    pub fn sanitized_unknown_option_names(&self) -> Vec<String> {
+        self.unknown_options
+            .iter()
+            .filter_map(|value| sanitized_option_name(value))
+            .collect()
+    }
+
+    /// Return the first positional extra only when it is safe to treat as a
+    /// command-like token in a diagnostic.
+    ///
+    /// This does **not** decide that the token is a subcommand. A consumer must
+    /// first know from its command contract that the current parse position
+    /// expects a command rather than an arbitrary operand. The helper merely
+    /// enforces the portable shell-word grammar before the token is echoed.
+    #[must_use]
+    pub fn sanitized_command_candidate(&self) -> Option<String> {
+        self.extras
+            .first()
+            .and_then(|value| sanitized_shell_word(value))
+    }
+
+    /// Redaction-safe one-line summary for generic production diagnostics.
+    ///
+    /// Unknown option names are retained after stripping inline values. Native
+    /// parser error strings and positional values are deliberately summarized
+    /// only by count because those channels can be value-bearing.
+    #[must_use]
+    pub fn redacted_diagnostic_summary(&self) -> String {
+        let mut parts = Vec::new();
+        let unknown = self.sanitized_unknown_option_names();
+        if !unknown.is_empty() {
+            let noun = if unknown.len() == 1 { "option" } else { "options" };
+            parts.push(format!("unknown {noun}: {}", unknown.join(", ")));
+        }
+        if !self.errors.is_empty() {
+            let noun = if self.errors.len() == 1 { "parse error" } else { "parse errors" };
+            parts.push(format!("{} {noun}", self.errors.len()));
+        }
+        if !self.extras.is_empty() {
+            let noun = if self.extras.len() == 1 {
+                "positional extra"
+            } else {
+                "positional extras"
+            };
+            parts.push(format!("{} {noun}", self.extras.len()));
+        }
+        if parts.is_empty() {
+            return "no invocation errors".to_owned();
+        }
+        parts.join("; ")
+    }
+}
+
+fn sanitized_option_name(raw: &str) -> Option<String> {
+    let option = raw.split_once('=').map_or(raw, |(name, _)| name);
+    if option.len() < 2 || option.len() > 128 || !option.starts_with('-') || option == "--" {
+        return None;
+    }
+    if !option
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return None;
+    }
+    Some(option.to_owned())
+}
+
+fn sanitized_shell_word(raw: &str) -> Option<String> {
+    if raw.is_empty() || raw.len() > 96 || raw.starts_with('-') {
+        return None;
+    }
+    if !raw
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return None;
+    }
+    Some(raw.to_owned())
+}
+
 /// The `[commands.*]` path selected by argv, independent of the env map.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ResolvedCommands {

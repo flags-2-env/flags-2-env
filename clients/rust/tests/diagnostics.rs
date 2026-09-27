@@ -2,11 +2,7 @@ use std::collections::HashMap;
 
 use flags2env::StructuredParse;
 
-fn parse_with(
-    unknown_options: &[&str],
-    extras: &[&str],
-    errors: &[&str],
-) -> StructuredParse {
+fn parse_with(unknown_options: &[&str], extras: &[&str], errors: &[&str]) -> StructuredParse {
     StructuredParse {
         flags: HashMap::new(),
         provided_flags: HashMap::new(),

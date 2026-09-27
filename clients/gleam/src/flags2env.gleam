@@ -26,3 +26,25 @@ pub fn apply(argv: List(String), env: Dict(String, String)) -> Dict(String, Stri
     dict.insert(combined, key, value)
   })
 }
+
+
+@external(erlang, "flags2env_native", "parse_structured_json")
+pub fn parse_structured_json(argv: List(String)) -> String
+
+@external(erlang, "flags2env_native", "parse_structured_json")
+pub fn parse_structured_json_with_config(
+  argv: List(String),
+  config_path: String,
+) -> String
+
+@external(erlang, "flags2env_native", "audit_config_json")
+pub fn audit_config_json() -> String
+
+@external(erlang, "flags2env_native", "audit_config_json")
+pub fn audit_config_json_with_config(config_path: String) -> String
+
+@external(erlang, "flags2env_native", "audit_config_status")
+pub fn audit_config_status() -> Int
+
+@external(erlang, "flags2env_native", "audit_config_status")
+pub fn audit_config_status_with_config(config_path: String) -> Int

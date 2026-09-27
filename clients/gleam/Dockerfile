@@ -6,7 +6,7 @@ COPY clients/erlang ./clients/erlang
 
 RUN apt-get update && apt-get install -y --no-install-recommends build-essential make && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /tmp/beam/ebin /tmp/beam/priv /tmp/gleam/src /tmp/erlang_libs/flags2env_native/ebin /tmp/erlang_libs/flags2env_native/priv
-RUN erlc -o /tmp/beam/ebin clients/gleam/flags2env_native.erl && cp /tmp/beam/ebin/flags2env_native.beam /tmp/erlang_libs/flags2env_native/ebin/
+RUN erlc -o /tmp/beam/ebin clients/gleam/src/flags2env_native.erl && cp /tmp/beam/ebin/flags2env_native.beam /tmp/erlang_libs/flags2env_native/ebin/
 RUN ERL_INCLUDE="$(erl -noshell -eval 'io:format("~s/erts-~s/include", [code:root_dir(), erlang:system_info(version)]), halt().')" && \
   cc -std=c99 -DF2E_BEAM_MODULE_NATIVE -fPIC -shared -I"$ERL_INCLUDE" -Iclients/erlang/c_src clients/erlang/c_src/flags2env_nif.c clients/erlang/c_src/parser.c -o /tmp/beam/priv/flags2env_nif.so && \
   cp /tmp/beam/priv/flags2env_nif.so /tmp/erlang_libs/flags2env_native/priv/

@@ -35,3 +35,24 @@ unless combined["PORT"] == "8181" and combined["KEEP"] == "1" do
   IO.inspect(combined, label: "unexpected combined map")
   System.halt(1)
 end
+
+
+unless Flags2Env.audit_config_status(config) == 0 do
+  IO.puts(:stderr, "flags contract audit should pass")
+  System.halt(1)
+end
+
+structured = Flags2Env.parse_structured_json(["app", "--port", "8181"], config)
+
+unless String.contains?(structured, "\"providedFlags\"") and
+         String.contains?(structured, "\"PORT\":\"8181\"") do
+  IO.inspect(structured, label: "unexpected structured report")
+  System.halt(1)
+end
+
+rejected = Flags2Env.parse_structured_json(["app", "--definitely-unknown"], config)
+
+unless String.contains?(rejected, "--definitely-unknown") do
+  IO.inspect(rejected, label: "unknown option missing from structured report")
+  System.halt(1)
+end

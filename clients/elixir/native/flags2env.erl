@@ -9,6 +9,8 @@
   parse/2,
   parse_structured_json/1,
   parse_structured_json/2,
+  help_requested/1,
+  help_table_for_argv/4,
   audit_config_json/0,
   audit_config_json/1,
   audit_config_status/0,
@@ -44,6 +46,12 @@ parse_structured_json(_Argv) ->
   erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 parse_structured_json(_Argv, _ConfigPath) ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+help_requested(_Argv) ->
+  erlang:nif_error({nif_not_loaded, ?MODULE}).
+
+help_table_for_argv(_Argv, _CommandName, _TerminalColumns, _ConfigPath) ->
   erlang:nif_error({nif_not_loaded, ?MODULE}).
 
 audit_config_json() ->

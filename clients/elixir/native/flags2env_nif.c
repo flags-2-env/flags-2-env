@@ -347,6 +347,113 @@ static ERL_NIF_TERM f2e_beam_parse_structured_default(
   return f2e_beam_parse_structured_argv(env, argv[0], NULL);
 }
 
+
+static int f2e_beam_copy_argv(
+    ErlNifEnv *env,
+    ERL_NIF_TERM argv_term,
+    char ***items_out,
+    unsigned int *count_out) {
+  unsigned int list_len = 0;
+  if (!enif_get_list_length(env, argv_term, &list_len)) {
+    return 0;
+  }
+
+  char **items = (char **)enif_alloc(sizeof(char *) * list_len);
+  if (!items && list_len > 0) {
+    return 0;
+  }
+  if (list_len > 0) {
+    memset(items, 0, sizeof(char *) * list_len);
+  }
+
+  ERL_NIF_TERM list = argv_term;
+  for (unsigned int i = 0; i < list_len; i++) {
+    ERL_NIF_TERM head;
+    if (!enif_get_list_cell(env, list, &head, &list)
+        || !f2e_beam_copy_term_string(env, head, &items[i])) {
+      for (unsigned int j = 0; j < i; j++) {
+        enif_free(items[j]);
+      }
+      enif_free(items);
+      return 0;
+    }
+  }
+
+  *items_out = items;
+  *count_out = list_len;
+  return 1;
+}
+
+static void f2e_beam_free_argv(char **items, unsigned int count) {
+  if (!items) {
+    return;
+  }
+  for (unsigned int i = 0; i < count; i++) {
+    enif_free(items[i]);
+  }
+  enif_free(items);
+}
+
+static ERL_NIF_TERM f2e_beam_help_requested(
+    ErlNifEnv *env,
+    int argc,
+    const ERL_NIF_TERM argv[]) {
+  if (argc != 1) {
+    return enif_make_badarg(env);
+  }
+
+  char **items = NULL;
+  unsigned int count = 0;
+  if (!f2e_beam_copy_argv(env, argv[0], &items, &count)) {
+    return enif_make_badarg(env);
+  }
+
+  int requested = f2e_is_help_requested((int)count, (const char *const *)items);
+  f2e_beam_free_argv(items, count);
+  return enif_make_atom(env, requested ? "true" : "false");
+}
+
+static ERL_NIF_TERM f2e_beam_help_table_for_argv(
+    ErlNifEnv *env,
+    int argc,
+    const ERL_NIF_TERM argv[]) {
+  if (argc != 4) {
+    return enif_make_badarg(env);
+  }
+
+  char **items = NULL;
+  unsigned int count = 0;
+  char *command_name = NULL;
+  char *config_path = NULL;
+  int columns = 0;
+
+  if (!f2e_beam_copy_argv(env, argv[0], &items, &count)
+      || !f2e_beam_copy_term_string(env, argv[1], &command_name)
+      || !enif_get_int(env, argv[2], &columns)
+      || !f2e_beam_copy_term_string(env, argv[3], &config_path)) {
+    f2e_beam_free_argv(items, count);
+    if (command_name) {
+      enif_free(command_name);
+    }
+    if (config_path) {
+      enif_free(config_path);
+    }
+    return enif_make_badarg(env);
+  }
+
+  char *table = f2e_help_table_for_argv_from_file(
+      config_path,
+      command_name,
+      (int)count,
+      (const char *const *)items,
+      columns);
+
+  f2e_beam_free_argv(items, count);
+  enif_free(command_name);
+  enif_free(config_path);
+  return f2e_beam_owned_json_binary(env, table);
+}
+
 static ERL_NIF_TERM f2e_beam_audit_config(ErlNifEnv *env, int argc, const ERL_NIF_TERM argv[]) {
   if (argc != 1) {
     return enif_make_badarg(env);
@@ -411,6 +518,8 @@ static ErlNifFunc f2e_beam_funcs[] = {
   {"parse", 2, f2e_beam_parse, 0},
   {"parse_structured_json", 1, f2e_beam_parse_structured_default, 0},
   {"parse_structured_json", 2, f2e_beam_parse_structured, 0},
+  {"help_requested", 1, f2e_beam_help_requested, 0},
+  {"help_table_for_argv", 4, f2e_beam_help_table_for_argv, 0},
   {"audit_config_json", 0, f2e_beam_audit_config_default, 0},
   {"audit_config_json", 1, f2e_beam_audit_config, 0},
   {"audit_config_status", 0, f2e_beam_audit_config_status_default, 0},

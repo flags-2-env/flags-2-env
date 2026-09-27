@@ -25,6 +25,14 @@ defmodule Flags2Env do
     :flags2env.parse_structured_json(argv, config_path)
   end
 
+  def help_requested(argv) do
+    :flags2env.help_requested(argv)
+  end
+
+  def help_table_for_argv(argv, command_name, terminal_columns, config_path) do
+    :flags2env.help_table_for_argv(argv, command_name, terminal_columns, config_path)
+  end
+
   def audit_config_json do
     :flags2env.audit_config_json()
   end

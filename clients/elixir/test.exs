@@ -56,3 +56,16 @@ unless String.contains?(rejected, "--definitely-unknown") do
   IO.inspect(rejected, label: "unknown option missing from structured report")
   System.halt(1)
 end
+
+
+unless Flags2Env.help_requested(["app", "--help"]) do
+  IO.puts(:stderr, "exact --help token should be detected")
+  System.halt(1)
+end
+
+help = Flags2Env.help_table_for_argv(["app", "--help"], "app", 100, config)
+
+unless String.contains?(help, "--port") do
+  IO.inspect(help, label: "contract-generated help missing declared port flag")
+  System.halt(1)
+end

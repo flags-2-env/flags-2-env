@@ -18,7 +18,7 @@ The canonical source repository is
 for every source reference.
 
 The ten-day compatibility window for the original
-[`ORESoftware/flags-2-env@2946224fb3a1bd84c0e39146b24f5f1ca8d69862`](https://github.com/ORESoftware/flags-2-env?ref=2946224fb3a1bd84c0e39146b24f5f1ca8d69862)
+[`ORESoftware/flags-2-env`](https://github.com/ORESoftware/flags-2-env)
 repository ran from 2026-08-09 and **ended on 2026-08-19**. That repository is
 no longer a supported source: it is kept as a read-only historical source and
 redirect notice, so existing immutable references to already-published commits
@@ -27,7 +27,7 @@ manifests, documentation links — must point at the canonical repository.
 
 The canonical Zed package is `flags-2-env/flags-2-env@0.3.0`. Zed treats
 `org/name` as immutable package identity and has no package-alias field, so
-a compatibility Zed package at version `0.3.0` under the former `oresoftware` namespace was published separately from the exact same
+`oresoftware/flags-2-env@0.3.0` was published separately from the exact same
 tagged source commit during the window; it remains installable but receives no
 new versions. See [`docs/source-migration.md`](docs/source-migration.md) for the
 machine-checked contract, publication order, and the cutoff procedure that
@@ -438,7 +438,7 @@ reinstallation with `zed install --frozen --do-not-write-new-manifest --allow-bu
 --adapter none` for manifestless consumers.
 
 Until the end of 2026-08-19, the compatibility coordinate
-the former `oresoftware` namespace at `^0.3` resolves a separately published artifact from
+`oresoftware/flags-2-env@^0.3` resolves a separately published artifact from
 the same tagged source commit. New manifests should use the canonical
 `flags-2-env/flags-2-env` coordinate.
 
@@ -725,7 +725,7 @@ Other language clients should be published through their own package ecosystems 
 Java/Kotlin/Scala/Groovy/Clojure: Maven-compatible registries, primarily Maven Central/Sonatype
 Ruby: RubyGems, for example flags2env
 Rust: crates.io, for example flags2env
-Go: Go modules from github.com/flags-2-env/flags-2-env/clients/golang
+Go: Go modules from github.com/oresoftware/flags-2-env/clients/golang
 Python: PyPI, for example flags2env
 PHP: Packagist, for example oresoftware/flags2env
 Dart: pub.dev, for example flags2env
@@ -752,7 +752,7 @@ and audit commands; use `--release` on a machine with Homebrew configured. The
 C, Bash, and Zsh client `publish.sh` wrappers also surface that Homebrew release
 path.
 
-BEAM clients share the Erlang NIF in `clients/erlang/c_src/flags2env_nif.c`; compile it with Erlang headers plus `clients/erlang/c_src/parser.c` into `priv/flags2env_nif.so`. On macOS, add `-undefined dynamic_lookup` when linking the NIF. Gleam uses `clients/gleam/flags2env_native.erl` as a native shim so its public module can still be named `flags2env` without colliding with the NIF module. Java uses `clients/java/native/flags2env_jni.c`; Kotlin, Scala, Groovy, and Clojure build facade packages over that Java bridge.
+BEAM clients share the Erlang NIF in `clients/erlang/c_src/flags2env_nif.c`; compile it with Erlang headers plus `clients/erlang/c_src/parser.c` into `priv/flags2env_nif.so`. On macOS, add `-undefined dynamic_lookup` when linking the NIF. Gleam uses `clients/gleam/src/flags2env_native.erl` as a native shim so its public module can still be named `flags2env` without colliding with the NIF module. Java uses `clients/java/native/flags2env_jni.c`; Kotlin, Scala, Groovy, and Clojure build facade packages over that Java bridge.
 
 Node, Bun, and Deno use syntax-highlighted source files instead of `.ejs` templates:
 
@@ -1066,7 +1066,7 @@ import (
 	"os"
 	"strings"
 
-	flags2env "github.com/flags-2-env/flags-2-env/clients/golang"
+	flags2env "github.com/oresoftware/flags-2-env/clients/golang"
 )
 
 func envMap() map[string]string {
@@ -1116,7 +1116,7 @@ import (
 	"strconv"
 	"strings"
 
-	flags2env "github.com/flags-2-env/flags-2-env/clients/golang"
+	flags2env "github.com/oresoftware/flags-2-env/clients/golang"
 )
 
 type AppEnv struct {

@@ -16,6 +16,7 @@ import sys
 import tempfile
 import termios
 import tomllib
+import unicodedata
 from pathlib import Path
 from typing import Any, Iterator
 
@@ -184,9 +185,13 @@ def semantic_tokens(value: str) -> list[str]:
     # (for example `sql | json`, `machine-readable`, or `CI/AI`). Keep the
     # exact normalized substring as the strongest check, then compare ordered
     # semantic tokens within the already-isolated description column.
+    text = unicodedata.normalize("NFC", normalized(value))
+    # Preserve Unicode words and symbols such as currency and lock glyphs.
+    # Dropping every non-ASCII character makes missing multilingual help pass.
     return [
         token.casefold()
-        for token in re.findall(r"[A-Za-z0-9]+", normalized(value))
+        for token in re.findall(r"[^\W_]+|[^\w\s]", text)
+        if any(unicodedata.category(char)[0] in "LMNS" for char in token)
     ]
 
 
@@ -196,12 +201,27 @@ def description_matches(expected: str, rendered_column: str) -> bool:
         return True
     expected_tokens = semantic_tokens(expected)
     if not expected_tokens:
-        return True
+        return False
     rendered_tokens = iter(semantic_tokens(rendered_column))
     return all(
         any(candidate == token for candidate in rendered_tokens)
         for token in expected_tokens
     )
+
+
+def terminal_cells(line: str) -> list[str]:
+    """Index table borders by terminal cells rather than Python characters."""
+    cells: list[str] = []
+    for char in line:
+        codepoint = ord(char)
+        if unicodedata.category(char) in {"Mn", "Me"} or codepoint in {0x200B, 0x200C, 0x200D}:
+            if cells:
+                cells[-1] += char
+            continue
+        cells.append(char)
+        if unicodedata.east_asian_width(char) in {"W", "F"} or 0x1F300 <= codepoint <= 0x1FAFF:
+            cells.append("")
+    return cells
 
 
 def table_column(output: str, headers: set[str]) -> str:
@@ -230,9 +250,10 @@ def table_column(output: str, headers: set[str]) -> str:
                     break
             continue
         start, end = bounds
-        if len(line) <= end or line[start - 1] != "|" or line[end] != "|":
+        cells = terminal_cells(line)
+        if len(cells) <= end or cells[start - 1] != "|" or cells[end] != "|":
             continue
-        value = line[start:end].strip()
+        value = "".join(cells[start:end]).strip()
         if value and value not in headers:
             fragments.append(value)
     return normalized(" ".join(fragments))

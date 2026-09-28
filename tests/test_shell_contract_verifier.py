@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import importlib.util
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -16,6 +17,54 @@ SPEC.loader.exec_module(MODULE)
 
 
 class ShellContractVerifierTests(unittest.TestCase):
+    def test_wide_unicode_rows_are_read_at_terminal_cell_boundaries(self) -> None:
+        output = """
+| Option(s)                        | Env                  | Type       | Default        | Description                              |
+| --secure                         | APP_SECURE           | bool       | -              | 認証が必要です 🔒 Values: true, false.   |
+|                                  |                      |            |                | Negate with --no-secure.                 |
+| --tenant                         | APP_TENANT           | string     | -              | 配置 tenant 設定                         |
+"""
+        descriptions = MODULE.table_column(output, {"Description"})
+        self.assertIn("認証が必要です 🔒", descriptions)
+        self.assertIn("配置 tenant 設定", descriptions)
+        self.assertNotIn("APP_SECURE", descriptions)
+        self.assertEqual(MODULE.terminal_cells("|e\u0301東京🔒|"), ["|", "e\u0301", "東", "", "京", "", "🔒", "", "|"])
+
+    def test_missing_unicode_descriptions_do_not_pass_an_empty_token_check(self) -> None:
+        for expected in ["認証が必要です", "مرحبا", "🔒", "€", "…"]:
+            with self.subTest(expected=expected):
+                self.assertFalse(MODULE.description_matches(expected, ""))
+                self.assertFalse(MODULE.description_matches(expected, "unrelated"))
+                self.assertTrue(MODULE.description_matches(expected, expected))
+
+    def test_mixed_unicode_help_requires_every_word_and_symbol(self) -> None:
+        for expected, incomplete in [
+            ("配置 tenant 設定", "tenant"),
+            ("🔒 restricted", "restricted"),
+            ("Cost € 10", "Cost 10"),
+        ]:
+            with self.subTest(expected=expected):
+                self.assertFalse(MODULE.description_matches(expected, incomplete))
+                self.assertTrue(MODULE.description_matches(expected, expected))
+
+    def test_unicode_words_preserve_casefold_and_canonical_accents(self) -> None:
+        self.assertTrue(MODULE.description_matches("CAFÉ: accès", "cafe\u0301 accès"))
+        self.assertTrue(MODULE.description_matches("認証：必要", "認証 必要"))
+        self.assertFalse(MODULE.description_matches("認証：必要", "認証 不要"))
+
+    def test_help_admission_rejects_a_missing_non_ascii_description(self) -> None:
+        output = (
+            "+------------+----------------------+\n"
+            "| Option(s)  | Description          |\n"
+            "+------------+----------------------+\n"
+            "| --secure   | unrelated            |\n"
+            "+------------+----------------------+\n"
+        )
+        root = {"flags": {"secure": {"help": "認証が必要です"}}}
+        with patch.object(MODULE, "terminal_help", return_value=(0, output)):
+            with self.assertRaisesRegex(RuntimeError, "omitted description"):
+                MODULE.check_help(Path("unused-cli"), "fixture", Path(".cli-flags.toml"), root, {})
+
     def test_selected_columns_are_reconstructed_without_interleaving(self) -> None:
         output = """
 +----------------------+------------+----------------+-----------------------+

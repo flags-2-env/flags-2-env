@@ -220,6 +220,16 @@ function parseArgs(argv) {
   return { config, outputDir, typeName };
 }
 
+async function thawIfPresent(path) {
+  try {
+    await chmod(path, 0o644);
+  } catch (error) {
+    if (error?.code !== "ENOENT") {
+      throw error;
+    }
+  }
+}
+
 export async function generateTypedEnvKeys({ config, outputDir, typeName }) {
   const source = await readFile(config, "utf8");
   const contract = parseContract(source);
@@ -231,6 +241,7 @@ export async function generateTypedEnvKeys({ config, outputDir, typeName }) {
   );
   for (const [name, contents] of Object.entries(rendered)) {
     const path = join(outputDir, name);
+    await thawIfPresent(path);
     await writeFile(path, contents);
     await chmod(path, 0o444);
   }

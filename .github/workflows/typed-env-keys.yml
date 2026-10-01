@@ -1,0 +1,45 @@
+name: typed-env-keys
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/generate-typed-env-keys.mjs'
+      - 'scripts/test-typed-env-keys.mjs'
+      - '.github/workflows/typed-env-keys.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/generate-typed-env-keys.mjs'
+      - 'scripts/test-typed-env-keys.mjs'
+      - '.github/workflows/typed-env-keys.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generator-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.17.0'
+      - name: Test closed typed env-key generation
+        run: node scripts/test-typed-env-keys.mjs
+      - name: Verify generated Rust key map compiles
+        shell: bash
+        run: |
+          tmp="$(mktemp -d)"
+          cat > "$tmp/.cli-flags.toml" <<'EOF'
+          [identity]
+          type_name = "CiEnv"
+          [flags.port]
+          env = "PORT"
+          type = "integer"
+          [flags.log]
+          env = "RUST_LOG"
+          type = "string"
+          EOF
+          node scripts/generate-typed-env-keys.mjs "$tmp/.cli-flags.toml" --output-dir "$tmp/generated"
+          rustc --edition=2021 --crate-type lib "$tmp/generated/env_keys.rs" -o "$tmp/libtyped_env.rlib"

@@ -1,0 +1,62 @@
+name: Temporary ORES fleet org audit
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/ores-fleet-org-audit.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit-org:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        org:
+          - sonus-auris
+          - usa-acc
+          - memebank
+          - fanwaave
+          - hypesiege
+          - drone-mngr
+          - shared-auth
+          - opto-sync
+          - ores-otel
+          - zed-pkg
+          - flags-2-env
+    env:
+      ORES_CLI_REV: 8e475955e4aaf7e9383b00980135f93d47b8e291
+      RUSTUP_TOOLCHAIN: 1.95.0
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout audit harness
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Checkout immutable ores-cli
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: ORESoftware/ores-cli
+          ref: ${{ env.ORES_CLI_REV }}
+          path: .audit-tools/ores-cli
+          persist-credentials: false
+
+      - name: Build immutable ores-cli
+        shell: bash
+        run: |
+          set -euo pipefail
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
+          (cd "$GITHUB_WORKSPACE/.audit-tools/ores-cli" && cargo build --locked --release --bin oresc)
+
+      - name: Audit complete GitHub organization
+        shell: bash
+        env:
+          TARGET_ORG: ${{ matrix.org }}
+        run: |
+          set -euo pipefail
+          "$GITHUB_WORKSPACE/.audit-tools/ores-cli/target/release/oresc" --no-json audit org --org "$TARGET_ORG"

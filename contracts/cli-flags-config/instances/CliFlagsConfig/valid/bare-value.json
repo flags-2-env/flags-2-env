@@ -1,0 +1,13 @@
+{
+  "parse": {
+    "require_equals": true
+  },
+  "flags": {
+    "allow_read": {
+      "env": "APP_ALLOW_READ",
+      "aliases": ["allow-read"],
+      "type": "string",
+      "bare_value": "*"
+    }
+  }
+}

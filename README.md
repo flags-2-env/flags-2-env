@@ -183,7 +183,31 @@ errors_env = "FLAGS2ENV_PARSE_ERRORS"
 allow_unknown = false
 ```
 
-`require_equals = true` means non-boolean values must be inline (`--port=8080`, `-p8080`, or `-p=8080`) instead of separated (`--port 8080`). `stop_at_first_positional = true` stops scanning once a non-flag token such as `exec` or `run` is found. `positionals_env`, `unknown_options_env`, and `errors_env` store JSON-array strings in the returned map; omit them if you want those tokens ignored.
+`require_equals = true` means non-boolean values must be inline (`--port=8080`, `-p8080`, or `-p=8080`) instead of separated (`--port 8080`).
+
+For a non-boolean option that is meaningful both with and without an attached
+value, declare `bare_value` (alias: `implicit_value`). The value is applied
+only when argv explicitly contains the option with no value; it is **not** a
+default. This is useful for Deno-style capability flags where the bare spelling
+means “all” and an equals-attached value narrows the scope:
+
+```toml
+[parse]
+require_equals = true
+
+[flags.allow_read]
+env = "APP_ALLOW_READ"
+aliases = ["allow-read"]
+type = "string"
+bare_value = "*"
+```
+
+With that declaration, `--allow-read` sets `APP_ALLOW_READ=*`,
+`--allow-read=./data` sets `APP_ALLOW_READ=./data`, and
+`--allow-read main.ores` leaves `main.ores` as a positional rather than
+silently consuming it as a permission scope. Boolean flags do not accept
+`bare_value`; their existing bare true / negated false semantics remain
+unchanged. `stop_at_first_positional = true` stops scanning once a non-flag token such as `exec` or `run` is found. `positionals_env`, `unknown_options_env`, and `errors_env` store JSON-array strings in the returned map; omit them if you want those tokens ignored.
 
 Set `[parse] allow_unknown = true`, pass `--allow-unknown`, or set `FLAGS2ENV_ALLOW_UNKNOWN=1` to suppress unknown-option collection for flags that belong to downstream code. The older `allow_hidden`, `--allow-hidden`, and `FLAGS2ENV_ALLOW_HIDDEN` spellings are accepted as aliases. A bare `--` always stops flags2env parsing; later tokens are treated as positionals when `positionals_env` is configured.
 

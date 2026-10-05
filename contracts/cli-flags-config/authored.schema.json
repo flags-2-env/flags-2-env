@@ -62,6 +62,8 @@
         "short": { "type": "string" },
         "type": { "type": "string" },
         "default": {},
+        "bare_value": {},
+        "implicit_value": {},
         "help": { "type": "string" },
         "description": { "type": "string" },
         "true_aliases": { "type": "array", "items": { "type": "string" } },

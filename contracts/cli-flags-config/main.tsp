@@ -47,6 +47,13 @@ model FlagSpec {
   short?: string;
   type?: string;
   default?: unknown;
+
+  // Value applied only when argv explicitly supplies a non-boolean option
+  // without an attached value. Pair with parse.require_equals=true when a
+  // following positional must never be consumed as the option's value.
+  bare_value?: unknown;
+  implicit_value?: unknown;
+
   help?: string;
   description?: string;
   true_aliases?: string[];

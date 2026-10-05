@@ -1895,6 +1895,13 @@ else
   printf 'bundle contract: no python3; skipped\n'
 fi
 
+# Non-boolean bare values: a flag can mean "all" when present bare while
+# requiring explicit '=' for scoped values. This is the shape used by
+# Deno-style permission flags such as --allow-read / --allow-read=./data.
+BARE_VALUE_DIR="$ROOT_DIR/tests/bare-value"
+run_config_case "$BARE_VALUE_DIR" '{"ALLOW_READ":"*","DEBUG":"true"}' app --allow-read program.ores --debug
+run_config_case "$BARE_VALUE_DIR" '{"ALLOW_READ":"./data","DEBUG":"true"}' app --allow-read=./data program.ores --debug
+
 printf 'flags2env tests passed\n'
 
 # First-class env-only contract boundary.

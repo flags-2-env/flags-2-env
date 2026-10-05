@@ -1,0 +1,13 @@
+[parse]
+require_equals = true
+
+[flags.allow_read]
+env = "ALLOW_READ"
+aliases = ["allow-read"]
+type = "string"
+bare_value = "*"
+
+[flags.debug]
+env = "DEBUG"
+aliases = ["debug"]
+type = "bool"

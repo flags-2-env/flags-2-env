@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
 /** Minimal Java/Graal host-side smoke for Oreslang JNI C bridge. */
-public final class Flags2EnvNativeSmoke {
+public final class Flags2EnvNative {
     static {
         System.loadLibrary("flags2env_oreslang_jni");
     }

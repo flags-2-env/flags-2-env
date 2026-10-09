@@ -146,3 +146,13 @@ prebuilt-manifest-selftest: prebuilt-manifest
 	python3 $(PREBUILT_MANIFEST) self-test --manifest build/manifest.json --artifact-root $(PREBUILT_STAGING)
 
 .PHONY: prebuilt-manifest prebuilt-verify prebuilt-manifest-selftest
+
+# Oreslang native C ABI shares the canonical parser (no fork).
+.PHONY: oreslang-abi-test oreslang-abi-shared
+oreslang-abi-test: | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -Isrc src/parser.c src/terminal_context.c clients/oreslang/abi.c clients/oreslang/tests/abi-test.c -o $(BUILD_DIR)/oreslang-abi-test
+	./$(BUILD_DIR)/oreslang-abi-test clients/oreslang/tests/flags.toml
+
+oreslang-abi-shared: $(LIB_OBJECTS) | $(BUILD_DIR)
+	$(CC) $(CFLAGS) -fPIC -c clients/oreslang/abi.c -o $(BUILD_DIR)/oreslang-abi.o
+	$(CC) $(SHARED_FLAGS) $(LDFLAGS) $(LIB_OBJECTS) $(BUILD_DIR)/oreslang-abi.o -o $(BUILD_DIR)/libflags2env_oreslang.so

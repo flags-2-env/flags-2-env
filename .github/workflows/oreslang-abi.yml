@@ -22,3 +22,16 @@ jobs:
         run: |
           make oreslang-abi-shared
           nm -D build/libflags2env_oreslang.so | grep -F f2e_oreslang_parse_json_file
+
+      - if: runner.os == 'Linux'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - if: runner.os == 'Linux'
+        name: Run real Java/Graal JNI bridge smoke
+        run: |
+          make oreslang-abi-jni
+          javac -d build/oreslang-jni-test clients/oreslang/tests/Flags2EnvNative.java
+          java -Djava.library.path=build -cp build/oreslang-jni-test \
+            dev.oreslang.runtime.Flags2EnvNative clients/oreslang/tests/flags.toml

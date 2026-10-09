@@ -156,3 +156,9 @@ oreslang-abi-test: | $(BUILD_DIR)
 oreslang-abi-shared: $(LIB_OBJECTS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) -fPIC -c clients/oreslang/abi.c -o $(BUILD_DIR)/oreslang-abi.o
 	$(CC) $(SHARED_FLAGS) $(LDFLAGS) $(LIB_OBJECTS) $(BUILD_DIR)/oreslang-abi.o -o $(BUILD_DIR)/libflags2env_oreslang.so
+
+# JNI adapter for the Oreslang Java/Graal host (requires a JDK toolchain).
+.PHONY: oreslang-abi-jni
+oreslang-abi-jni: | $(BUILD_DIR)
+	@test -n "$(JAVA_HOME)" || (echo "JAVA_HOME is required for JNI headers" >&2; exit 2)
+	$(CC) $(CFLAGS) -fPIC -I"$(JAVA_HOME)/include" -I"$(JAVA_HOME)/include/linux" -shared src/parser.c src/terminal_context.c clients/oreslang/abi.c clients/oreslang/jni.c -o $(BUILD_DIR)/libflags2env_oreslang_jni.so

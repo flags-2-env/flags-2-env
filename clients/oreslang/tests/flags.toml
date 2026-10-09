@@ -1,0 +1,7 @@
+[env]
+files = []
+[flags.port]
+env = "PORT"
+aliases = ["port"]
+type = "integer"
+default = 3000

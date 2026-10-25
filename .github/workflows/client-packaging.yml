@@ -166,3 +166,50 @@ jobs:
 
       - name: Compile and run generated interface
         run: tests/codegen-docker/run.sh "${{ matrix.runtime }}"
+  lockfile-repair-probe:
+    name: Generate candidate npm lock (temporary recovery probe)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: "24"
+      - name: Generate minimal package-lock repair
+        id: repair
+        run: |
+          set +e
+          npm audit fix --package-lock-only --ignore-scripts --no-fund
+          repair_rc=$?
+          set -e
+          audit_rc=0
+          npm ls undici --all || true
+          npm audit --json > "$RUNNER_TEMP/npm-audit.json" || audit_rc=$?
+          cp package-lock.json "$RUNNER_TEMP/package-lock.json"
+          sha256sum "$RUNNER_TEMP/package-lock.json"
+          printf 'npm-audit-fix-exit=%s\nnpm-audit-exit=%s\n' "$repair_rc" "$audit_rc" > "$RUNNER_TEMP/lock-repair-status.txt"
+          echo "repair_exit=$repair_rc" >> "$GITHUB_OUTPUT"
+          echo "audit_exit=$audit_rc" >> "$GITHUB_OUTPUT"
+          exit 0
+      - name: Upload generated lock and audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: npm-lock-candidate
+          path: |
+            ${{ runner.temp }}/package-lock.json
+            ${{ runner.temp }}/npm-audit.json
+            ${{ runner.temp }}/lock-repair-status.txt
+          if-no-files-found: error
+          retention-days: 1
+      - name: Enforce successful npm lock repair
+        if: steps.repair.outputs.repair_exit != '0'
+        run: exit 1
+      - name: Enforce high-severity audit clearance
+        if: steps.repair.outputs.audit_exit != '0'
+        run: exit 1
+

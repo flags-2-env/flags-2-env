@@ -205,7 +205,7 @@ jobs:
             ${{ runner.temp }}/npm-audit.json
             ${{ runner.temp }}/lock-repair-status.txt
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 7
       - name: Enforce successful npm lock repair
         if: steps.repair.outputs.repair_exit != '0'
         run: exit 1

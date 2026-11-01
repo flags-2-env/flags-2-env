@@ -362,7 +362,7 @@ for client in \
   nodejs bun deno python java kotlin scala groovy clojure rust golang c cpp \
   bash zsh \
   csharp fsharp php ruby dart swift elixir erlang gleam haskell ocaml \
-  reasonml perl lua nim r matlab julia fortran zig crystal solidity
+  reasonml perl lua nim r matlab julia fortran zig crystal solidity oreslang
 do
   require_client "$client"
 done
@@ -968,6 +968,291 @@ require_contains clients/crystal/shard.yml '^repository: https://github\.com/fla
 require_contains scripts/docker-check-new-clients.sh 'cd clients/crystal && shards install &&'
 require_contains scripts/docker-check-new-clients.sh 'crystal run --link-flags "-L/work/build" clients/crystal/test\.cr'
 forbid_contains scripts/docker-check-new-clients.sh 'shards install --production'
+require_path clients/oreslang/.ores.pkg.toml
+require_path clients/oreslang/LICENSE
+require_path clients/oreslang/README.md
+require_path clients/oreslang/src/flags2env.ores
+require_path clients/oreslang/native/flags2env_ores_bridge.c
+require_path clients/oreslang/native/flags2env_ores_bridge.h
+require_path clients/oreslang/native/bridge_test.c
+require_path clients/oreslang/native/bridge_fault_test.c
+require_path clients/oreslang/native/parser.c
+require_path clients/oreslang/native/parser.h
+require_path clients/oreslang/tests/client_contract.ores
+require_path clients/oreslang/tests/abi-status-scalar.ores
+require_path clients/oreslang/tests/source_contract.mjs
+require_same_file src/parser.c clients/oreslang/native/parser.c
+require_same_file src/parser.h clients/oreslang/native/parser.h
+require_contains clients/oreslang/native/flags2env_ores_bridge.c '#include "parser\.h"'
+forbid_contains clients/oreslang/native/flags2env_ores_bridge.c '\.\./\.\./\.\./src/parser\.h'
+require_contains clients/oreslang/.ores.pkg.toml '^name = "flags2env"require_contains scripts/render-client.mjs 'src/parser\.c'
+require_contains scripts/render-client.mjs 'native'
+forbid_contains scripts/publish-client.sh 'cp src/parser\.c src/parser\.h dist/r/src/'
+require_contains scripts/publish-client.sh 'npm publish --access public'
+require_contains scripts/publish-client.sh 'node scripts/render-client\.mjs deno dist/deno'
+require_contains scripts/publish-client.sh '\$\{PYTHON:-python3\} -m build'
+require_contains scripts/publish-client.sh 'twine upload'
+require_contains scripts/publish-client.sh 'clients/golang/v\$'
+require_contains scripts/publish-client.sh 'git tag "\$\{PACKAGE_VERSION:\?set PACKAGE_VERSION\}"'
+require_contains scripts/publish-client.sh 'git push origin "v\$\{PACKAGE_VERSION\}"'
+require_contains scripts/publish-client.sh 'scripts/publish-homebrew\.sh --release'
+require_contains scripts/publish-client.sh 'mvn -P release deploy'
+require_contains scripts/publish-client.sh 'gradle -Prelease publish'
+require_contains scripts/publish-client.sh 'sbt publishSigned sonatypeBundleRelease'
+require_contains scripts/publish-client.sh 'publish-central-ossrh-compat\.sh'
+require_contains scripts/publish-client.sh 'dotnet nuget push'
+require_contains scripts/publish-client.sh 'gem push'
+require_contains scripts/publish-client.sh 'dart pub publish'
+require_contains scripts/publish-client.sh 'mix hex.publish'
+require_contains scripts/publish-client.sh 'rebar3 hex publish'
+require_contains scripts/publish-client.sh 'gleam publish --yes'
+require_contains scripts/publish-client.sh 'cabal upload'
+require_contains scripts/publish-client.sh 'opam publish submit'
+require_contains scripts/publish-client.sh 'opam lint flags2env-reason\.opam'
+require_contains scripts/publish-client.sh 'cpan-upload'
+require_contains scripts/publish-client.sh 'luarocks upload flags2env-0\.1\.0-1\.rockspec'
+require_contains scripts/publish-client.sh 'nimble publish'
+require_contains scripts/publish-client.sh 'submit_cran'
+require_contains scripts/publish-client.sh 'zip -r flags2env-matlab\.zip \+flags2env native README\.md LICENSE'
+require_contains scripts/publish-client.sh '@JuliaRegistrator register subdir=clients/julia'
+require_contains scripts/docker-check-new-clients.sh 'dotnet run'
+require_contains scripts/docker-check-new-clients.sh 'dotnet run --project /tmp/f2e-csharp-test/f2e-csharp-test\.csproj'
+require_contains scripts/docker-check-new-clients.sh 'dotnet run --project /tmp/f2e-fsharp-test/f2e-fsharp-test\.fsproj'
+require_contains scripts/docker-check-new-clients.sh 'dotnet pack clients/csharp/Flags2Env\.csproj -c Release'
+require_contains scripts/docker-check-new-clients.sh 'dotnet pack clients/fsharp/Flags2Env\.FSharp\.fsproj -c Release'
+require_contains scripts/docker-check-new-clients.sh 'OreSoftware\.Flags2Env\.\*\.nupkg'
+require_contains scripts/docker-check-new-clients.sh 'OreSoftware\.Flags2Env\.FSharp\.\*\.nupkg'
+require_contains scripts/docker-check-new-clients.sh 'missing net6\.0 library'
+forbid_contains scripts/docker-check-new-clients.sh 'FLAGS2ENV_FIXTURE=tests/fixtures|FLAGS2ENV_NATIVE_LIB=build/libflags2env\.so.*dotnet|LD_LIBRARY_PATH=build.*dotnet'
+require_contains scripts/docker-check-new-clients.sh 'cmake --build /tmp/flags2env-cpp-build --verbose'
+require_contains README.md 'undefined dynamic_lookup'
+require_contains .github/workflows/client-packaging.yml 'scripts/audit-client-packaging\.sh'
+require_contains .github/workflows/client-packaging.yml 'npm run release:audit'
+require_contains .github/workflows/client-packaging.yml 'scripts/docker-check-new-clients\.sh'
+require_contains .github/workflows/client-packaging.yml 'full_docker_checks'
+require_contains .github/workflows/client-packaging.yml 'tests/run\.sh'
+require_contains .github/workflows/client-packaging.yml 'tests/codegen-docker/run\.sh'
+require_contains tests/codegen-docker/Dockerfile 'FROM dart:stable AS test-dart'
+require_contains tests/codegen-docker/Dockerfile 'FROM node:22-bookworm AS test-nodejs'
+require_contains tests/codegen-docker/nodejs/main.ts 'f2e\.coerce'
+require_contains tests/codegen-docker/run.sh 'json-schema'
+require_contains .github/workflows/cli-flags-audit.yml 'scripts/audit-changed-cli-flags\.sh'
+require_contains .github/workflows/cli-flags-audit.yml '\*\*/\.cli-flags\.toml'
+require_contains .github/workflows/cli-flags-audit.yml '\*\*/\.env'
+require_contains scripts/audit-changed-cli-flags.sh 'audit env'
+
+for path in \
+  clients/cpp/test.cpp \
+  clients/scala/src/main/scala/com/oresoftware/flags2env/Flags2Env.scala \
+  clients/groovy/src/main/groovy/com/oresoftware/flags2env/Flags2Env.groovy \
+  clients/kotlin/src/main/kotlin/com/oresoftware/flags2env/Flags2Env.kt \
+  clients/clojure/src/com/oresoftware/flags2env.clj \
+  clients/csharp/Flags2EnvTest.cs \
+  clients/fsharp/Flags2EnvTest.fs \
+  clients/rust/tests/smoke.rs \
+  clients/elixir/test.exs \
+  clients/erlang/flags2env_test.erl \
+  clients/gleam/test.gleam \
+  clients/r/R/flags2env.R \
+  clients/r/tests/smoke.R \
+  clients/matlab/+flags2env/defaultHeaderPath.m \
+  clients/matlab/test.m \
+  clients/fortran/src/flags2env.f90 \
+  clients/fortran/test.f90 \
+  clients/zig/src/flags2env.zig \
+  clients/zig/test.zig \
+  clients/crystal/src/flags2env.cr \
+  clients/solidity/contracts/Flags2Env.sol \
+  clients/perl/test.pl \
+  clients/lua/test.lua \
+  clients/nim/test.nim \
+  clients/crystal/test.cr \
+  clients/julia/test/runtests.jl \
+  clients/haskell/test.hs \
+  clients/ocaml/test.ml \
+  clients/reasonml/src/Test.re
+do
+  require_path "$path"
+done
+
+for path in \
+  clients/cpp/test.cpp \
+  clients/crystal/test.cr \
+  clients/fortran/test.f90 \
+  clients/haskell/test.hs \
+  clients/julia/test/runtests.jl \
+  clients/lua/test.lua \
+  clients/nim/test.nim \
+  clients/ocaml/test.ml \
+  clients/reasonml/src/Test.re \
+  clients/rust/tests/smoke.rs \
+  clients/zig/test.zig
+do
+  forbid_contains "$path" 'tests/fixtures|\.\./\.\./tests'
+done
+
+native_lib="$(native_library_name)"
+require_contains src/parser.h 'f2e_generate_types_from_file'
+require_contains src/parser.h 'f2e_coerce_json_from_file'
+require_contains clients/nodejs/addon.c 'coerceJson'
+require_contains clients/nodejs/addon.c 'generateTypes'
+require_contains clients/nodejs/lib.mjs 'export function coerce'
+require_contains clients/nodejs/lib.mjs 'export function parseFromArgs'
+require_contains clients/nodejs/lib.mjs 'export function generateTypes'
+require_contains clients/nodejs/lib.cjs 'CoercionError'
+require_contains clients/nodejs/lib.ts 'export function coerce'
+require_contains clients/nodejs/cli.mjs '"generate"'
+audit_rendered_js_client nodejs package.json binding.gyp addon.c src/parser.c src/parser.h lib.mjs lib.cjs lib.ts cli.mjs
+audit_rendered_js_client bun package.json "native/$native_lib" lib.mjs lib.cjs lib.ts
+audit_rendered_js_client deno deno.json "native/$native_lib" mod.ts lib.ts
+audit_npm_pack_client solidity "contracts/Flags2Env.sol package.json README.md LICENSE" "test.js test.ts Dockerfile"
+audit_perl_manifest
+audit_ruby_gem
+audit_r_staging
+audit_matlab_archive
+audit_docker_check_plan
+
+if [ "$status" -eq 0 ]; then
+  printf 'client packaging audit passed\n'
+fi
+exit "$status"
+
+require_contains clients/oreslang/.ores.pkg.toml '^roots = \["src"\]require_contains scripts/render-client.mjs 'src/parser\.c'
+require_contains scripts/render-client.mjs 'native'
+forbid_contains scripts/publish-client.sh 'cp src/parser\.c src/parser\.h dist/r/src/'
+require_contains scripts/publish-client.sh 'npm publish --access public'
+require_contains scripts/publish-client.sh 'node scripts/render-client\.mjs deno dist/deno'
+require_contains scripts/publish-client.sh '\$\{PYTHON:-python3\} -m build'
+require_contains scripts/publish-client.sh 'twine upload'
+require_contains scripts/publish-client.sh 'clients/golang/v\$'
+require_contains scripts/publish-client.sh 'git tag "\$\{PACKAGE_VERSION:\?set PACKAGE_VERSION\}"'
+require_contains scripts/publish-client.sh 'git push origin "v\$\{PACKAGE_VERSION\}"'
+require_contains scripts/publish-client.sh 'scripts/publish-homebrew\.sh --release'
+require_contains scripts/publish-client.sh 'mvn -P release deploy'
+require_contains scripts/publish-client.sh 'gradle -Prelease publish'
+require_contains scripts/publish-client.sh 'sbt publishSigned sonatypeBundleRelease'
+require_contains scripts/publish-client.sh 'publish-central-ossrh-compat\.sh'
+require_contains scripts/publish-client.sh 'dotnet nuget push'
+require_contains scripts/publish-client.sh 'gem push'
+require_contains scripts/publish-client.sh 'dart pub publish'
+require_contains scripts/publish-client.sh 'mix hex.publish'
+require_contains scripts/publish-client.sh 'rebar3 hex publish'
+require_contains scripts/publish-client.sh 'gleam publish --yes'
+require_contains scripts/publish-client.sh 'cabal upload'
+require_contains scripts/publish-client.sh 'opam publish submit'
+require_contains scripts/publish-client.sh 'opam lint flags2env-reason\.opam'
+require_contains scripts/publish-client.sh 'cpan-upload'
+require_contains scripts/publish-client.sh 'luarocks upload flags2env-0\.1\.0-1\.rockspec'
+require_contains scripts/publish-client.sh 'nimble publish'
+require_contains scripts/publish-client.sh 'submit_cran'
+require_contains scripts/publish-client.sh 'zip -r flags2env-matlab\.zip \+flags2env native README\.md LICENSE'
+require_contains scripts/publish-client.sh '@JuliaRegistrator register subdir=clients/julia'
+require_contains scripts/docker-check-new-clients.sh 'dotnet run'
+require_contains scripts/docker-check-new-clients.sh 'dotnet run --project /tmp/f2e-csharp-test/f2e-csharp-test\.csproj'
+require_contains scripts/docker-check-new-clients.sh 'dotnet run --project /tmp/f2e-fsharp-test/f2e-fsharp-test\.fsproj'
+require_contains scripts/docker-check-new-clients.sh 'dotnet pack clients/csharp/Flags2Env\.csproj -c Release'
+require_contains scripts/docker-check-new-clients.sh 'dotnet pack clients/fsharp/Flags2Env\.FSharp\.fsproj -c Release'
+require_contains scripts/docker-check-new-clients.sh 'OreSoftware\.Flags2Env\.\*\.nupkg'
+require_contains scripts/docker-check-new-clients.sh 'OreSoftware\.Flags2Env\.FSharp\.\*\.nupkg'
+require_contains scripts/docker-check-new-clients.sh 'missing net6\.0 library'
+forbid_contains scripts/docker-check-new-clients.sh 'FLAGS2ENV_FIXTURE=tests/fixtures|FLAGS2ENV_NATIVE_LIB=build/libflags2env\.so.*dotnet|LD_LIBRARY_PATH=build.*dotnet'
+require_contains scripts/docker-check-new-clients.sh 'cmake --build /tmp/flags2env-cpp-build --verbose'
+require_contains README.md 'undefined dynamic_lookup'
+require_contains .github/workflows/client-packaging.yml 'scripts/audit-client-packaging\.sh'
+require_contains .github/workflows/client-packaging.yml 'npm run release:audit'
+require_contains .github/workflows/client-packaging.yml 'scripts/docker-check-new-clients\.sh'
+require_contains .github/workflows/client-packaging.yml 'full_docker_checks'
+require_contains .github/workflows/client-packaging.yml 'tests/run\.sh'
+require_contains .github/workflows/client-packaging.yml 'tests/codegen-docker/run\.sh'
+require_contains tests/codegen-docker/Dockerfile 'FROM dart:stable AS test-dart'
+require_contains tests/codegen-docker/Dockerfile 'FROM node:22-bookworm AS test-nodejs'
+require_contains tests/codegen-docker/nodejs/main.ts 'f2e\.coerce'
+require_contains tests/codegen-docker/run.sh 'json-schema'
+require_contains .github/workflows/cli-flags-audit.yml 'scripts/audit-changed-cli-flags\.sh'
+require_contains .github/workflows/cli-flags-audit.yml '\*\*/\.cli-flags\.toml'
+require_contains .github/workflows/cli-flags-audit.yml '\*\*/\.env'
+require_contains scripts/audit-changed-cli-flags.sh 'audit env'
+
+for path in \
+  clients/cpp/test.cpp \
+  clients/scala/src/main/scala/com/oresoftware/flags2env/Flags2Env.scala \
+  clients/groovy/src/main/groovy/com/oresoftware/flags2env/Flags2Env.groovy \
+  clients/kotlin/src/main/kotlin/com/oresoftware/flags2env/Flags2Env.kt \
+  clients/clojure/src/com/oresoftware/flags2env.clj \
+  clients/csharp/Flags2EnvTest.cs \
+  clients/fsharp/Flags2EnvTest.fs \
+  clients/rust/tests/smoke.rs \
+  clients/elixir/test.exs \
+  clients/erlang/flags2env_test.erl \
+  clients/gleam/test.gleam \
+  clients/r/R/flags2env.R \
+  clients/r/tests/smoke.R \
+  clients/matlab/+flags2env/defaultHeaderPath.m \
+  clients/matlab/test.m \
+  clients/fortran/src/flags2env.f90 \
+  clients/fortran/test.f90 \
+  clients/zig/src/flags2env.zig \
+  clients/zig/test.zig \
+  clients/crystal/src/flags2env.cr \
+  clients/solidity/contracts/Flags2Env.sol \
+  clients/perl/test.pl \
+  clients/lua/test.lua \
+  clients/nim/test.nim \
+  clients/crystal/test.cr \
+  clients/julia/test/runtests.jl \
+  clients/haskell/test.hs \
+  clients/ocaml/test.ml \
+  clients/reasonml/src/Test.re
+do
+  require_path "$path"
+done
+
+for path in \
+  clients/cpp/test.cpp \
+  clients/crystal/test.cr \
+  clients/fortran/test.f90 \
+  clients/haskell/test.hs \
+  clients/julia/test/runtests.jl \
+  clients/lua/test.lua \
+  clients/nim/test.nim \
+  clients/ocaml/test.ml \
+  clients/reasonml/src/Test.re \
+  clients/rust/tests/smoke.rs \
+  clients/zig/test.zig
+do
+  forbid_contains "$path" 'tests/fixtures|\.\./\.\./tests'
+done
+
+native_lib="$(native_library_name)"
+require_contains src/parser.h 'f2e_generate_types_from_file'
+require_contains src/parser.h 'f2e_coerce_json_from_file'
+require_contains clients/nodejs/addon.c 'coerceJson'
+require_contains clients/nodejs/addon.c 'generateTypes'
+require_contains clients/nodejs/lib.mjs 'export function coerce'
+require_contains clients/nodejs/lib.mjs 'export function parseFromArgs'
+require_contains clients/nodejs/lib.mjs 'export function generateTypes'
+require_contains clients/nodejs/lib.cjs 'CoercionError'
+require_contains clients/nodejs/lib.ts 'export function coerce'
+require_contains clients/nodejs/cli.mjs '"generate"'
+audit_rendered_js_client nodejs package.json binding.gyp addon.c src/parser.c src/parser.h lib.mjs lib.cjs lib.ts cli.mjs
+audit_rendered_js_client bun package.json "native/$native_lib" lib.mjs lib.cjs lib.ts
+audit_rendered_js_client deno deno.json "native/$native_lib" mod.ts lib.ts
+audit_npm_pack_client solidity "contracts/Flags2Env.sol package.json README.md LICENSE" "test.js test.ts Dockerfile"
+audit_perl_manifest
+audit_ruby_gem
+audit_r_staging
+audit_matlab_archive
+audit_docker_check_plan
+
+if [ "$status" -eq 0 ]; then
+  printf 'client packaging audit passed\n'
+fi
+exit "$status"
+
+require_contains clients/oreslang/README.md 'evidence-gated'
+require_contains contracts/oreslang-client-backends.v1.json '"unsupported_is_pass": false'
+require_contains contracts/oreslang-client-backends.v1.json '"zero_step_ci_is_pass": false'
+require_contains scripts/publish-client.sh 'clients/oreslang/v\$\{PACKAGE_VERSION'
 require_contains clients/deno/deno.json '"native"'
 require_contains scripts/render-client.mjs 'src/parser\.c'
 require_contains scripts/render-client.mjs 'native'

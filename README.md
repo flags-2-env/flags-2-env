@@ -741,6 +741,7 @@ R: CRAN or R-universe
 .NET C#/F#: NuGet Gallery
 C/C++/Fortran/Zig/Crystal/MATLAB/Solidity: source packages or git-tagged releases
 Bash/Zsh: source packages, Homebrew-installed shell helpers, or git-tagged releases
+Oreslang: namespaced git-tagged source package; backend support remains evidence-gated
 ```
 
 Every client folder has a `publish.sh` wrapper. It defaults to a dry-run command printout and only publishes when passed `--release`. See `docs/plan.md` for the coverage plan and `clients/PUBLISHING.md` for package manifest controls such as `.npmignore`, `MANIFEST.in`, `.gemspec` file lists, Composer archive excludes, NuGet `.nuspec` files, `.pubignore`, `Package.swift` excludes, Mix package files, Cabal manifests, opam metadata, CPAN `MANIFEST.SKIP`, LuaRocks rockspecs, Nimble manifests, Julia `Project.toml`, and the Homebrew formula under `packaging/homebrew/Formula/`.

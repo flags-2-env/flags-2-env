@@ -24,6 +24,8 @@ script can map its arguments into environment variables in the current shell.
 
 BEAM clients use `clients/erlang/c_src/flags2env_nif.c` as the shared native implementation. Erlang and Elixir load it through the `flags2env` module; Gleam loads the same C implementation through `clients/gleam/src/flags2env_native.erl` so the public Gleam module can still be named `flags2env`. Java uses `clients/java/native/flags2env_jni.c` as a JNI bridge. Kotlin, Scala, Groovy, and Clojure reuse that Java bridge with small facade packages.
 
+The Oreslang client lives under `clients/oreslang`. Its public `.ores` API is host-neutral and its native bridge reuses the canonical C parser. Backend release support is gated on compiler-backed Java, LLVM, WebAssembly, Cranelift and .NET receipts; unsupported backends are never counted as passing.
+
 Additional native-runtime clients are scaffolded under:
 
 ```text

@@ -1,0 +1,10 @@
+schema_version = "1"
+
+[project]
+name = "flags2env"
+version = "0.1.0"
+root = "."
+
+[source]
+roots = ["src"]
+import_paths = []

@@ -21,6 +21,7 @@ tools to already be configured by CI.
 | Java/Kotlin/Scala/Groovy/Clojure | Maven Central/Sonatype-compatible repositories | Maven Central plugin, Gradle/sbt/tools.build publication metadata |
 | Rust | crates.io | `include` in `Cargo.toml` |
 | Go/Swift/C++/Fortran/Zig/Crystal/MATLAB | git tags or source archives | language package manifests where available |
+| Oreslang | git tags/source archive until an Oreslang package registry is designated | `.ores.pkg.toml`, `src/`, native bridge, README/license allowlist |
 | C/Bash/Zsh | Homebrew formula or git tags | native CLI, C library, and shell helpers installed from the formula |
 | C#/F# | NuGet Gallery | `.nuspec` files plus project item rules |
 | PHP | Packagist | Composer `archive.exclude` |

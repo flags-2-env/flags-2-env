@@ -1,0 +1,17 @@
+// Pure AttoLang permission-decision example; CLI flag parsing is NOT authorization.
+// The host must validate path/host scope, source, and current capability state.
+define module permission_gate as
+  pub fnc admitted(bool explicit_allow, bool explicit_deny,
+                   bool matching_scope, bool capability_live): bool {
+    return explicit_allow && !explicit_deny &&
+      matching_scope && capability_live;
+  }
+
+  pub fnc self_check(): bool {
+    return admitted(true,false,true,true) &&
+      !admitted(true,true,true,true) &&
+      !admitted(false,false,true,true) &&
+      !admitted(true,false,false,true) &&
+      !admitted(true,false,true,false);
+  }
+end

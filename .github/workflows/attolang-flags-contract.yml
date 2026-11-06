@@ -1,0 +1,53 @@
+name: AttoLang permission flag contract
+on:
+  pull_request:
+    paths:
+      - "examples/attolang/permission_gate.atto"
+      - "tests/attolang_flag_contract.test.mjs"
+      - "Makefile"
+      - ".github/workflows/attolang-flags-contract.yml"
+  push:
+    branches: [main]
+    paths:
+      - "examples/attolang/permission_gate.atto"
+      - "tests/attolang_flag_contract.test.mjs"
+      - "Makefile"
+      - ".github/workflows/attolang-flags-contract.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-parser-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: "22"
+      - name: Native parser and policy-shaped flag tests at exact head
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_SHA"
+          make cli
+          mkdir -p .formal-artifacts/atto-permissions
+          sha256sum \
+            examples/attolang/permission_gate.atto \
+            tests/attolang_flag_contract.test.mjs \
+            src/parser.c src/main.c \
+            > .formal-artifacts/atto-permissions/input.sha256
+          node --test tests/attolang_flag_contract.test.mjs \
+            | tee .formal-artifacts/atto-permissions/native-parser.log
+      - name: Retain exact-head parser evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: attolang-flags-${{ github.event.pull_request.head.sha || github.sha }}
+          path: .formal-artifacts/atto-permissions/
+          if-no-files-found: warn

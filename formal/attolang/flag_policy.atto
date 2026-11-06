@@ -1,0 +1,13 @@
+// Draft AttoLang policy oracle for declared flags and nested command visibility.
+define module flag_policy as
+  pub fnc scope_visible(bool declared_global, bool active_command_owns,
+                        bool active_ancestor_owns): bool {
+    return declared_global || active_command_owns || active_ancestor_owns;
+  }
+  pub fnc self_check(): bool {
+    return scope_visible(true,false,false) &&
+      scope_visible(false,true,false) &&
+      scope_visible(false,false,true) &&
+      !scope_visible(false,false,false);
+  }
+end

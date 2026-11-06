@@ -69,6 +69,7 @@ test: borrow-check readme-test parity-test $(PROCESS_SMOKE) $(API_HARDENING) $(A
 	./tests/run.sh
 	bash ./tests/shared-auth-cli-consumer.sh
 	node --test tests/negation.test.mjs
+	node --test tests/attolang_flag_contract.test.mjs
 	$(API_HARDENING)
 	$(ALLOCATION_FAILURE) tests/subcommands-deep/.cli-flags.toml
 	$(TERMINAL_CONTEXT_TEST)

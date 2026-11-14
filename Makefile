@@ -68,7 +68,7 @@ $(CLI): $(SRC) $(CONTEXT_SRC) $(CLI_SRC) $(HEADER) $(CONTEXT_HEADER) FORCE | $(B
 test: borrow-check readme-test parity-test $(PROCESS_SMOKE) $(API_HARDENING) $(ALLOCATION_FAILURE) $(TERMINAL_CONTEXT_TEST) $(DOTENV_API_TEST) $(HELP_UNICODE_TEST)
 	./tests/run.sh
 	bash ./tests/shared-auth-cli-consumer.sh
-	node --test tests/negation.test.mjs
+	node --test tests/negation.test.mjs tests/admission_order.test.mjs
 	$(API_HARDENING)
 	$(ALLOCATION_FAILURE) tests/subcommands-deep/.cli-flags.toml
 	$(TERMINAL_CONTEXT_TEST)

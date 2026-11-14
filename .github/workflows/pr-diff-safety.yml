@@ -1,0 +1,43 @@
+# Read-only, dependency-free PR diff safety check for every language in this repository.
+name: PR diff safety
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  diff-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout full history without retaining credentials
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Reject whitespace errors and newly committed sensitive paths
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          git cat-file -e "${BASE_SHA}^{commit}"
+          git cat-file -e "${HEAD_SHA}^{commit}"
+          git diff --check "$BASE_SHA" "$HEAD_SHA"
+          git diff --name-only -z --diff-filter=ACMR "$BASE_SHA" "$HEAD_SHA" > "$RUNNER_TEMP/changed-paths.nul"
+          failed=0
+          while IFS= read -r -d '' path; do
+            file="${path##*/}"
+            case "$file" in
+              .env|.env.*|id_rsa|id_ed25519|*.pem|*.key|*.p12|*.pfx)
+                case "$file" in
+                  *.example|*.sample|*.template) continue ;;
+                esac
+                printf 'Sensitive path committed in PR: %s\n' "$path" >&2
+                failed=1
+                ;;
+            esac
+          done < "$RUNNER_TEMP/changed-paths.nul"
+          exit "$failed"

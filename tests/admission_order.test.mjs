@@ -129,3 +129,38 @@ test('values resembling switches remain opaque values, never executable flags', 
   assert.equal(result.ADMIT_ALLOW, 'false');
   assert.equal(result.ADMIT_AUDIT, 'false');
 });
+
+test('every pair of recognized allow/deny spellings honors last-write precedence', () => {
+  const assignments = [
+    ['--allow', 'true'],
+    ['--allow=true', 'true'],
+    ['--permit', 'true'],
+    ['--no-allow', 'false'],
+    ['--!allow', 'false'],
+    ['--allow!', 'false'],
+    ['--allow=false', 'false'],
+  ];
+  for (const ambient of ['true', 'false']) {
+    for (const [first] of assignments) {
+      for (const [last, expected] of assignments) {
+        const result = resolveFlags([first, last], { ADMIT_ALLOW: ambient });
+        admitted(result);
+        assert.equal(
+          result.ADMIT_ALLOW,
+          expected,
+          `ambient=${ambient}; first=${first}; last=${last}`,
+        );
+      }
+    }
+  }
+});
+
+test('permission-shaped flags after -- remain positional after an explicit assignment', () => {
+  const result = resolveFlags(['--no-allow', '--', '--allow', '--allow=true', '--permit']);
+  admitted(result);
+  assert.equal(result.ADMIT_ALLOW, 'false');
+  assert.deepEqual(
+    diagnostics(result, 'ADMIT_POSITIONALS'),
+    ['--allow', '--allow=true', '--permit'],
+  );
+});

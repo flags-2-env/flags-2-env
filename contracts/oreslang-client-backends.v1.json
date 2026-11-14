@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "client": "oreslang",
+  "guest_api": "clients/oreslang/src/flags2env.ores",
+  "native_abi": "clients/oreslang/native/flags2env_ores_bridge.h",
+  "portable_scalar_fixture": "clients/oreslang/tests/abi-status-scalar.ores",
+  "required_backends": [
+    "java",
+    "llvm",
+    "wasm",
+    "cranelift",
+    "dotnet"
+  ],
+  "policy": {
+    "identical_guest_source": true,
+    "unsupported_is_pass": false,
+    "compile_only_is_runtime_pass": false,
+    "zero_step_ci_is_pass": false,
+    "raw_pointer_in_public_oreslang_api": false,
+    "blocking_native_call_on_actor_carrier": false
+  },
+  "capability_requirements": {
+    "java": [
+      "String",
+      "Fnc",
+      "class",
+      "host-adapter"
+    ],
+    "llvm": [
+      "String",
+      "Fnc",
+      "class",
+      "native-abi"
+    ],
+    "wasm": [
+      "String",
+      "Fnc",
+      "class",
+      "explicit-host-import"
+    ],
+    "cranelift": [
+      "checked-i64-scalar-fixture",
+      "future:String",
+      "future:Fnc",
+      "future:host-import"
+    ],
+    "dotnet": [
+      "String",
+      "Fnc",
+      "class",
+      "NativeAOT-host-adapter"
+    ]
+  },
+  "evidence": "not-attested",
+  "note": "This manifest is a required capability/evidence contract, not a parity claim."
+}

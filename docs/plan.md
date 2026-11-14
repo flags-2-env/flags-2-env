@@ -32,7 +32,7 @@ practical, destination repository names, and publish dry-runs for:
 - JavaScript, Python, Java, Kotlin, Scala, Groovy, Clojure, Rust, Go, C, C++,
   C#, F#, PHP, Ruby, Swift, Dart, Elixir, Erlang, Gleam, Haskell, OCaml,
   ReasonML, Perl, Lua, Nim, R, MATLAB, Julia, Fortran, Zig, Crystal, Solidity,
-  Bash, and Zsh.
+  Bash, Zsh, and Oreslang.
 
 `scripts/audit-client-packaging.sh` separately verifies every `clients/*`
 publish wrapper, including Node.js, Bun, Deno, Bash, and Zsh wrappers that are
@@ -47,8 +47,10 @@ not one-to-one rows in the language repository table.
 - Maven Central/Sonatype clients use Maven, Gradle, sbt, or tools.build
   publication metadata with source and documentation artifacts.
 - crates.io uses Cargo `include` rules.
-- Go, Swift, C, C++, Fortran, Zig, and Crystal publish through git tags or
-  source package conventions.
+- Go, Swift, C, C++, Fortran, Zig, Crystal, and Oreslang publish through git
+  tags or source package conventions. Oreslang release support is additionally
+  gated on compiler-backed backend evidence; scalar-only backend receipts do not
+  establish full client support.
 - NuGet uses `.nuspec` and project pack item rules for C# and F#.
 - Packagist, RubyGems, pub.dev, Hex.pm, Hackage, opam, CPAN, LuaRocks, Nimble,
   CRAN/R-universe, MATLAB source archives, Julia General Registry, npm

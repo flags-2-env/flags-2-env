@@ -1,0 +1,5 @@
+// Shared scalar ABI smoke for every Oreslang backend, including Cranelift.
+// Encodes public host statuses 0..4 without imports, strings or control flow.
+pub fnc main(): int {
+  return (0 * 10000) + (1 * 1000) + (2 * 100) + (3 * 10) + 4 - 1192;
+}

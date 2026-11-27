@@ -10,7 +10,7 @@ const requiredClients = [
   "rust", "golang", "c", "cpp", "csharp", "fsharp", "php", "ruby",
   "swift", "dart", "elixir", "erlang", "gleam", "haskell", "ocaml",
   "reasonml", "perl", "lua", "nim", "r", "matlab", "julia", "fortran",
-  "zig", "crystal", "solidity", "bash", "zsh",
+  "zig", "crystal", "solidity", "bash", "zsh", "oreslang",
 ];
 
 const expectedRepositories = {
@@ -49,9 +49,19 @@ const expectedRepositories = {
   solidity: "npm Registry",
   bash: "Homebrew / Git repository",
   zsh: "Homebrew / Git repository",
+  oreslang: "Git repository / source archive",
 };
 
 const packageControls = {
+  oreslang: [
+    ["clients/oreslang/.ores.pkg.toml", /^name = "flags2env"$/m, "Oreslang package name"],
+    ["clients/oreslang/.ores.pkg.toml", /^roots = \["src"\]$/m, "Oreslang package source allowlist"],
+    ["clients/oreslang/native/flags2env_ores_bridge.c", /#include "parser\.h"/, "Oreslang bridge uses package-local parser header"],
+    ["clients/oreslang/README.md", /release support remains evidence-gated/i, "Oreslang client does not overclaim backend support"],
+    ["scripts/publish-client.sh", /clients\/oreslang\/v\$\{PACKAGE_VERSION/, "Oreslang release tag is namespaced"],
+    ["contracts/oreslang-client-backends.v1.json", /"unsupported_is_pass": false/, "Oreslang backend contract fails closed on unsupported capability"],
+    ["contracts/oreslang-client-backends.v1.json", /"zero_step_ci_is_pass": false/, "Oreslang backend contract rejects zero-step evidence"],
+  ],
   nodejs: [
     [".npmignore", /^!clients\/nodejs\//m, "npm allowlist includes Node.js client"],
     [".npmignore", /^!LICENSE$/m, "npm allowlist includes package license"],
@@ -863,6 +873,32 @@ const matrix = [
     sources: ["clients/zsh/flags2env.zsh"],
     tests: ["clients/zsh/test.zsh"],
     publishIncludes: ["scripts/publish-homebrew.sh --release"],
+  },
+  {
+    language: "Oreslang",
+    client: "oreslang",
+    repository: "Git repository / source archive",
+    controls: [
+      "clients/oreslang/.ores.pkg.toml",
+      "clients/oreslang/README.md",
+      "clients/oreslang/LICENSE",
+      "contracts/oreslang-client-backends.v1.json",
+    ],
+    sources: [
+      "clients/oreslang/src/flags2env.ores",
+      "clients/oreslang/native/flags2env_ores_bridge.c",
+      "clients/oreslang/native/flags2env_ores_bridge.h",
+      "clients/oreslang/native/parser.c",
+      "clients/oreslang/native/parser.h",
+    ],
+    tests: [
+      "clients/oreslang/tests/client_contract.ores",
+      "clients/oreslang/tests/abi-status-scalar.ores",
+      "clients/oreslang/tests/source_contract.mjs",
+      "clients/oreslang/native/bridge_test.c",
+      "clients/oreslang/native/bridge_fault_test.c",
+    ],
+    publishIncludes: ["git tag \"clients/oreslang/v"],
   },
 ];
 

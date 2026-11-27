@@ -134,6 +134,14 @@ typedef struct {
   char type_value[F2E_MAX_VALUE];
   int has_default;
   char default_value[F2E_MAX_VALUE];
+  /* Optional value applied when a non-boolean option is present without an
+     explicit value. This is intentionally distinct from default: default is
+     ambient configuration, while bare_value records that argv explicitly
+     supplied the option. With [parse] require_equals=true this enables
+     Deno-style --allow-read / --allow-read=PATH semantics without consuming
+     the following positional. */
+  int has_bare_value;
+  char bare_value[F2E_MAX_VALUE];
   char help[F2E_MAX_VALUE];
   /* argv=false keeps the typed/env contract while removing CLI presentation. */
   int argv_enabled;
@@ -2048,6 +2056,13 @@ static int f2e_load_config(const char *config_path, F2EConfig *config) {
         current->has_default = 1;
         f2e_strlcpy(current->default_value, parsed, sizeof(current->default_value));
       }
+    } else if (f2e_streq(key, "bare_value") ||
+               f2e_streq(key, "implicit_value")) {
+      char parsed[F2E_MAX_VALUE];
+      if (f2e_parse_bare_value(value, parsed, sizeof(parsed))) {
+        current->has_bare_value = 1;
+        f2e_strlcpy(current->bare_value, parsed, sizeof(current->bare_value));
+      }
     } else if (f2e_streq(key, "requires_tty") ||
                f2e_streq(key, "requires_terminal") ||
                f2e_streq(key, "needs_tty")) {
@@ -3332,6 +3347,8 @@ static int f2e_apply_mixed_short_bundle(F2EConfig *config, int scope, F2EPair *p
              f2e_can_consume_separated_value(value_flag, argv[*index + 1])) {
     (*index)++;
     f2e_try_set_flag_value(value_flag, pairs, pair_count, argv[*index], errors);
+  } else if (value_flag->has_bare_value) {
+    f2e_try_set_flag_value(value_flag, pairs, pair_count, value_flag->bare_value, errors);
   }
   return 1;
 }
@@ -3435,6 +3452,8 @@ static void f2e_apply_long_arg(F2EConfig *config, int scope, F2EPair *pairs, siz
              f2e_can_consume_separated_value(flag, argv[*index + 1])) {
     (*index)++;
     f2e_try_set_flag_value(flag, pairs, pair_count, argv[*index], errors);
+  } else if (flag->has_bare_value) {
+    f2e_try_set_flag_value(flag, pairs, pair_count, flag->bare_value, errors);
   }
 }
 
@@ -3483,6 +3502,8 @@ static int f2e_apply_short_arg(F2EConfig *config, int scope, F2EPair *pairs, siz
                f2e_can_consume_separated_value(first, argv[*index + 1])) {
       (*index)++;
       f2e_try_set_flag_value(first, pairs, pair_count, argv[*index], errors);
+    } else if (first->has_bare_value) {
+      f2e_try_set_flag_value(first, pairs, pair_count, first->bare_value, errors);
     }
     return 1;
   }
@@ -3542,6 +3563,29 @@ static const char *f2e_audit_flag_name(const F2EFlag *flag) {
 }
 
 static void f2e_audit_bool_value_aliases(const F2EFlag *flag, F2EAudit *audit) {
+  if (flag->has_bare_value) {
+    if (flag->type == F2E_TYPE_BOOL) {
+      f2e_audit_add(audit, 1,
+                    "flags.%s bare_value is only valid for non-boolean flags; booleans already have bare true/false semantics",
+                    f2e_audit_flag_name(flag));
+    } else if (flag->type == F2E_TYPE_INT && !f2e_int_value_is_valid(flag->bare_value)) {
+      f2e_audit_add(audit, 1, "flags.%s bare_value \"%s\" is not a valid integer",
+                    f2e_audit_flag_name(flag), flag->bare_value);
+    } else if (flag->type == F2E_TYPE_FLOAT && !f2e_float_value_is_valid(flag->bare_value)) {
+      f2e_audit_add(audit, 1, "flags.%s bare_value \"%s\" is not a valid double",
+                    f2e_audit_flag_name(flag), flag->bare_value);
+    } else if (flag->type == F2E_TYPE_JSON && !f2e_json_value_is_valid(flag->bare_value)) {
+      f2e_audit_add(audit, 1, "flags.%s bare_value \"%s\" is not valid JSON",
+                    f2e_audit_flag_name(flag), flag->bare_value);
+    } else if (flag->type == F2E_TYPE_ARRAY && !f2e_json_container_is_valid(flag->bare_value, '[')) {
+      f2e_audit_add(audit, 1, "flags.%s bare_value \"%s\" is not a valid JSON array",
+                    f2e_audit_flag_name(flag), flag->bare_value);
+    } else if (flag->type == F2E_TYPE_MAP && !f2e_json_container_is_valid(flag->bare_value, '{')) {
+      f2e_audit_add(audit, 1, "flags.%s bare_value \"%s\" is not a valid JSON object",
+                    f2e_audit_flag_name(flag), flag->bare_value);
+    }
+  }
+
   if (flag->type != F2E_TYPE_BOOL) {
     if (flag->true_alias_count > 0 || flag->false_alias_count > 0) {
       f2e_audit_add(audit, 0, "flags.%s declares boolean value aliases but type is not bool", f2e_audit_flag_name(flag));
@@ -4000,6 +4044,9 @@ static void f2e_audit_config_semantics(const F2EConfig *config, F2EAudit *audit)
       }
       if (flag->true_alias_count > 0 || flag->false_alias_count > 0) {
         f2e_audit_add(audit, 1, "flags.%s argv = false cannot declare boolean value aliases", f2e_audit_flag_name(flag));
+      }
+      if (flag->has_bare_value) {
+        f2e_audit_add(audit, 1, "flags.%s argv = false cannot declare bare_value", f2e_audit_flag_name(flag));
       }
       if (flag->requires_tty != F2E_TTY_NONE) {
         f2e_audit_add(audit, 1, "flags.%s argv = false cannot require a tty", f2e_audit_flag_name(flag));
